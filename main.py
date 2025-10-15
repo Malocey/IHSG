@@ -38,6 +38,9 @@ class GameWidget(Widget):
         # Liste, um alle Gegner zu speichern.
         self.enemies = []
 
+        # Referenz zur Haupt-App, um auf Stats zuzugreifen
+        self.app = App.get_running_app()
+
         # Starte die Spiel-Schleife (update-Methode) 60 mal pro Sekunde.
         Clock.schedule_interval(self.update, 1.0 / 60.0)
         # Erzeuge alle 2 Sekunden einen neuen Gegner.
@@ -57,7 +60,11 @@ class GameWidget(Widget):
 
     def update(self, dt):
         # Diese Methode wird kontinuierlich aufgerufen.
-        hero_speed = 100
+        # Hole die aktuelle Heldengeschwindigkeit aus den berechneten Stats.
+        base_speed = self.app.character_stats.get('hero_speed', 100)
+        speed_multiplier = 1 + (self.app.character_stats.get('hero_speed_percent', 0) / 100.0)
+        hero_speed = base_speed * speed_multiplier
+
         self.hero.x += hero_speed * dt
         if self.hero.right > self.width:
             self.hero.x = 0
@@ -102,14 +109,13 @@ class HeroScreen(Screen):
         # Erstelle die Skill-Buttons
         for skill_id, skill in self.skill_nodes.items():
             button = Button(
-                text=f"{skill['name']}\n(Cost: {skill['cost']})",
                 size_hint=(None, None),
                 size=(150, 60),
                 pos=skill['position'],
                 halign='center'
             )
             button.skill_id = skill_id
-            button.bind(on_press=self.app.unlock_skill)
+            button.bind(on_press=self.app.upgrade_skill)
             self.skill_buttons[skill_id] = button
             skill_tree_layout.add_widget(button)
 
@@ -118,27 +124,39 @@ class HeroScreen(Screen):
         self.update_button_states()
 
     def update_button_states(self):
-        """Aktualisiert die Farben der Buttons basierend auf dem Freischalt-Status."""
+        """Aktualisiert die Texte und Farben der Buttons basierend auf dem Skill-Level."""
         for skill_id, button in self.skill_buttons.items():
             skill = self.skill_nodes[skill_id]
-            is_unlocked = skill_id in self.app.unlocked_skills
+            current_level = self.app.skill_levels.get(skill_id, 0)
 
-            # Überprüfe, ob alle Abhängigkeiten erfüllt sind
-            dependencies_met = all(dep in self.app.unlocked_skills for dep in skill['dependencies'])
-            can_unlock = self.app.skill_points >= skill['cost'] and dependencies_met
-
-            if is_unlocked:
-                button.background_color = (0, 1, 0, 1)  # Grün für freigeschaltet
-            elif can_unlock:
-                button.background_color = (1, 1, 0, 1)  # Gelb für verfügbar
+            # Aktualisiere den Button-Text
+            if current_level > 0:
+                button.text = f"{skill['name']}\n(Lv: {current_level}/{skill['max_level']})"
             else:
-                button.background_color = (1, 0, 0, 1)  # Rot für gesperrt
+                button.text = f"{skill['name']}\n(Unlock)"
+
+            # Aktualisiere die Button-Farbe
+            is_max_level = current_level >= skill['max_level']
+            if is_max_level:
+                button.background_color = (0.2, 0.8, 1, 1)  # Blau für Max-Level
+                continue
+
+            cost = skill['base_cost'] + current_level
+            dependencies_met = all(dep in self.app.skill_levels for dep in skill['dependencies'])
+            can_afford = self.app.skill_points >= cost
+
+            if current_level > 0: # Bereits freigeschaltet
+                button.background_color = (0, 1, 0, 1) if can_afford else (0.5, 0.5, 0.5, 1) # Grün / Grau
+            elif dependencies_met and can_afford: # Kann freigeschaltet werden
+                button.background_color = (1, 1, 0, 1) # Gelb
+            else: # Gesperrt
+                button.background_color = (1, 0, 0, 1) # Rot
 
 class IdleHordeSlayerApp(App):
     # Dies ist die Hauptklasse unserer Kivy-Anwendung.
     def build(self):
         # Spieler-Daten
-        self.unlocked_skills = {"base_attack"} # Start-Skill ist immer freigeschaltet
+        self.skill_levels = {"base_attack": 1} # Speichert das Level jedes freigeschalteten Skills
         self.gold = 0
         self.gems = 0
         self.score = 0
@@ -209,6 +227,7 @@ class IdleHordeSlayerApp(App):
         root_layout.add_widget(self.screen_manager)
         root_layout.add_widget(bottom_bar)
 
+        self.calculate_total_stats() # Berechne die initialen Stats beim Start
         return root_layout
 
     def change_screen(self, screen_name, *args):
@@ -218,35 +237,69 @@ class IdleHordeSlayerApp(App):
         if screen_name == 'hero':
             self.screen_manager.get_screen('hero').update_button_states()
 
-    def unlock_skill(self, button):
-        """Versucht, einen Skill freizuschalten, wenn der zugehörige Button geklickt wird."""
+    def upgrade_skill(self, button):
+        """Bearbeitet das Freischalten und Aufleveln eines Skills."""
         skill_id = button.skill_id
-        skill = self.screen_manager.get_screen('hero').skill_nodes[skill_id]
+        skill_data = self.screen_manager.get_screen('hero').skill_nodes[skill_id]
+        current_level = self.skill_levels.get(skill_id, 0)
 
-        # Überprüfe, ob der Skill bereits freigeschaltet ist
-        if skill_id in self.unlocked_skills:
-            print(f"Skill '{skill['name']}' ist bereits freigeschaltet.")
+        if current_level >= skill_data['max_level']:
+            print(f"Skill '{skill_data['name']}' ist bereits auf maximalem Level.")
             return
 
-        # Überprüfe die Kosten
-        if self.skill_points < skill['cost']:
-            print(f"Nicht genügend Skill-Punkte für '{skill['name']}'.")
+        # Kostenberechnung (Beispiel: Kosten steigen pro Level)
+        cost = skill_data['base_cost'] + current_level
+
+        if self.skill_points < cost:
+            print(f"Nicht genügend Skill-Punkte für '{skill_data['name']}'.")
             return
 
-        # Überprüfe die Abhängigkeiten
-        dependencies_met = all(dep in self.unlocked_skills for dep in skill['dependencies'])
-        if not dependencies_met:
-            print(f"Abhängigkeiten für '{skill['name']}' nicht erfüllt.")
-            return
+        # Wenn der Skill neu ist, überprüfe die Abhängigkeiten
+        if current_level == 0:
+            dependencies_met = all(dep in self.skill_levels for dep in skill_data['dependencies'])
+            if not dependencies_met:
+                print(f"Abhängigkeiten für '{skill_data['name']}' nicht erfüllt.")
+                return
 
-        # Alles in Ordnung, schalte den Skill frei
-        self.skill_points -= skill['cost']
-        self.unlocked_skills.add(skill_id)
-        print(f"Skill '{skill['name']}' freigeschaltet!")
+        # Alles in Ordnung, führe das Upgrade durch
+        self.skill_points -= cost
+        self.skill_levels[skill_id] = current_level + 1
+        print(f"Skill '{skill_data['name']}' auf Level {self.skill_levels[skill_id]} verbessert!")
 
         # Aktualisiere die UI
         self.skill_point_label.text = f"Skill Points: {self.skill_points}"
         self.screen_manager.get_screen('hero').update_button_states()
+        self.calculate_total_stats()
+
+    def calculate_total_stats(self):
+        """Berechnet die Gesamtstatistiken des Charakters basierend auf den Skill-Leveln."""
+        # Setze die Basis-Werte
+        self.character_stats = {
+            'attack_damage': 0,
+            'attack_speed_percent': 0,
+            'crit_chance_percent': 0,
+            'hero_speed': 100 # Basis-Geschwindigkeit in Pixel/Sekunde
+        }
+
+        skill_definitions = self.screen_manager.get_screen('hero').skill_nodes
+        for skill_id, level in self.skill_levels.items():
+            skill_data = skill_definitions.get(skill_id)
+            if not skill_data:
+                continue
+
+            for stat_bonus in skill_data['stats']:
+                stat_type = stat_bonus['type']
+                value_per_level = stat_bonus['value']
+
+                # Berechne den Bonus für den aktuellen Stat
+                if stat_type in self.character_stats:
+                    self.character_stats[stat_type] += value_per_level * level
+                else:
+                    # Fallback für Stats, die nicht im Basis-Dict sind (sollte nicht passieren bei korrekter Def)
+                    self.character_stats[stat_type] = value_per_level * level
+
+        print("Charakter-Stats aktualisiert:", self.character_stats)
+
 
     def update_stats(self, instance, *args):
         # Wird aufgerufen, wenn ein Gegner besiegt wird
