@@ -8,12 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Documentation files: `AGENTS.md`, `README.md`, `CHANGELOG.md`, `VERSION`.
-- Design document for visual effects: `docs/visual_effects_design.md`.
+- **Build System:** Created a `build.spec` file and a `build_windows.bat` script to allow for building a Windows executable using PyInstaller.
+- **Projectile Combat:** Replaced the touch-based combat with a system where the hero fires projectiles.
+- **Basic VFX:** Implemented a `VFX` class and a simple hit effect that is triggered when a projectile hits an enemy.
+- **Dependencies:** Added `pyinstaller` to `requirements.txt`.
 
 ## [0.1.0] - 2025-10-15
-
-This is the first functional version of the Idle Horde Slayer game, featuring a complete skill and character stat system.
 
 ### Added
 - **Skill Leveling System:** Skills now have levels and can be upgraded.
@@ -25,3 +25,4 @@ This is the first functional version of the Idle Horde Slayer game, featuring a 
 - **Initial Project Setup:** Created the basic file structure, Kivy application window, and core game loop with a moving hero and spawning enemies.
 - **Player Data:** Implemented systems to track player currency (gold, gems), score, and skill points.
 - **Robust Asset Loading:** Entities now have a fallback (colored rectangle) if their sprite images are not found, preventing crashes.
+- **Documentation:** Added `AGENTS.md`, `README.md`, `CHANGELOG.md`, `VERSION`, and a design document for visual effects.

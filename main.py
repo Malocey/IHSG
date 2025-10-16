@@ -18,14 +18,13 @@ from kivy.uix.scatterlayout import ScatterLayout
 from kivy.uix.floatlayout import FloatLayout
 
 # Lokale Klassen importieren
-from src.entities import Hero, Enemy
+from src.entities import Hero, Enemy, Projectile, VFX
 from src.skills import SKILL_TREE
 
 class GameWidget(Widget):
     # Dieses Widget wird das Haupt-Widget für unser Spiel sein.
     # Hier werden wir die Spiellogik und die Darstellung implementieren.
 
-    # Definiere ein neues Event für das Besiegen von Gegnern.
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.register_event_type('on_enemy_killed')
@@ -35,8 +34,9 @@ class GameWidget(Widget):
         self.hero.pos = (self.width / 2, 50)
         self.add_widget(self.hero)
 
-        # Liste, um alle Gegner zu speichern.
+        # Listen, um alle Spiel-Objekte zu speichern.
         self.enemies = []
+        self.projectiles = []
 
         # Referenz zur Haupt-App, um auf Stats zuzugreifen
         self.app = App.get_running_app()
@@ -45,6 +45,8 @@ class GameWidget(Widget):
         Clock.schedule_interval(self.update, 1.0 / 60.0)
         # Erzeuge alle 2 Sekunden einen neuen Gegner.
         Clock.schedule_interval(self.spawn_enemy, 2.0)
+        # Setze den initialen Angriffs-Timer
+        self.attack_cooldown = 0
 
     def on_enemy_killed(self, *args):
         # Platzhalter-Methode für das Event. Wird benötigt, damit das Event registriert wird.
@@ -58,23 +60,57 @@ class GameWidget(Widget):
         self.enemies.append(enemy)
         self.add_widget(enemy)
 
+    def attack(self):
+        """Erzeugt ein Projektil, das vom Helden abgefeuert wird."""
+        projectile = Projectile()
+        projectile.pos = (self.hero.center_x - projectile.width / 2, self.hero.top)
+        self.projectiles.append(projectile)
+        self.add_widget(projectile)
+
     def update(self, dt):
-        # Diese Methode wird kontinuierlich aufgerufen.
-        # Hole die aktuelle Heldengeschwindigkeit aus den berechneten Stats.
+        # Bewegungslogik des Helden
         base_speed = self.app.character_stats.get('hero_speed', 100)
         speed_multiplier = 1 + (self.app.character_stats.get('hero_speed_percent', 0) / 100.0)
         hero_speed = base_speed * speed_multiplier
-
         self.hero.x += hero_speed * dt
         if self.hero.right > self.width:
             self.hero.x = 0
 
-        # Überprüfe Kollisionen zwischen Held und Gegnern.
-        for enemy in self.enemies[:]:
-            if self.hero.collide_widget(enemy):
-                self.dispatch('on_enemy_killed')
-                self.enemies.remove(enemy)
-                self.remove_widget(enemy)
+        # Angriffslogik des Helden
+        self.attack_cooldown -= dt
+        if self.attack_cooldown <= 0:
+            self.attack()
+            attack_speed_stat = 1 + (self.app.character_stats.get('attack_speed_percent', 0) / 100.0)
+            if attack_speed_stat == 0:
+                attack_speed_stat = 1
+            self.attack_cooldown = 1.0 / attack_speed_stat
+
+        # Projektil-Logik
+        for p in self.projectiles[:]:
+            p.move()
+            # Entferne Projektile, die den Bildschirm verlassen
+            if p.top > self.height:
+                self.projectiles.remove(p)
+                self.remove_widget(p)
+                continue
+
+            # Kollisionserkennung mit Gegnern
+            for enemy in self.enemies[:]:
+                if p.collide_widget(enemy):
+                    # Treffer!
+                    self.dispatch('on_enemy_killed')
+                    # Erzeuge einen visuellen Effekt an der Position des Gegners
+                    vfx = VFX(pos=enemy.pos)
+                    self.add_widget(vfx)
+
+                    self.enemies.remove(enemy)
+                    self.remove_widget(enemy)
+
+                    # Entferne das Projektil nach dem Treffer
+                    if p in self.projectiles:
+                        self.projectiles.remove(p)
+                        self.remove_widget(p)
+                    break # Das Projektil kann nur einen Gegner treffen
 
 # Definition der verschiedenen Screens der App
 class GameScreen(Screen):
