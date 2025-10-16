@@ -95,7 +95,7 @@ class GameWidget(Widget):
                     break
 
         for crystal in self.xp_crystals[:]:
-            if self.hero.collide_point(*crystal.center):
+            if self.hero.collide_point(*crystal.center, 150):
                  crystal.move_towards(self.hero.center, dt)
             if self.hero.collide_widget(crystal):
                 self.app.add_xp(crystal.value)
@@ -186,7 +186,9 @@ class IdleHordeSlayerApp(App):
     def build(self):
         self.skill_levels = {"base_attack": 1}
         self.gold = 0; self.score = 0; self.skill_points = 10
-        self.character_stats = {}; self.run_level = 1; self.run_xp = 0; self.xp_to_next_level = 5; self.run_stats = {}
+        self.run_level = 1; self.run_xp = 0; self.xp_to_next_level = 5; self.run_stats = {}
+        # Platzhalter für Boni aus dem zukünftigen Ability Tree
+        self.ability_tree_bonuses = {'strength_multiplier': 1.0, 'dexterity_multiplier': 1.0, 'intelligence_multiplier': 1.0}
         root_layout = BoxLayout(orientation='vertical')
         top_bar = BoxLayout(size_hint_y=None, height=100, padding=10, spacing=20)
         with top_bar.canvas.before: Color(0.1, 0.1, 0.1, 1); top_bar.rect = Rectangle(size=top_bar.size, pos=top_bar.pos)
@@ -213,7 +215,9 @@ class IdleHordeSlayerApp(App):
         if self.score > 0 and self.score % 10 == 0: self.skill_points += 1
         self.score_label.text = f"Kills: {self.score}"; self.gold_label.text = f"Gold: {self.gold}"; self.skill_point_label.text = f"Skill Points: {self.skill_points}"
         instance.spawn_crystal("blue", enemy.center)
-        if enemy in instance.enemies: instance.enemies.remove(enemy); instance.remove_widget(enemy)
+        if enemy in instance.enemies:
+            instance.enemies.remove(enemy)
+            instance.remove_widget(enemy)
     def add_xp(self, amount):
         self.run_xp += amount
         if self.run_xp >= self.xp_to_next_level:
@@ -249,7 +253,8 @@ class IdleHordeSlayerApp(App):
         self.skill_point_label.text = f"Skill Points: {self.skill_points}"
         self.screen_manager.get_screen('hero').update_button_states(); self.calculate_total_stats()
     def calculate_total_stats(self):
-        self.character_stats = {'attack_damage': 0, 'attack_speed_percent': 0, 'crit_chance_percent': 0, 'hero_speed': 100, 'max_health': 100}
+        base_attributes = {'strength': 10, 'dexterity': 10, 'intelligence': 10}
+        self.character_stats = {'attack_damage': 5, 'attack_speed_percent': 0, 'crit_chance_percent': 5, 'hero_speed': 100, 'max_health': 100, 'max_mana': 50}
         if hasattr(self, 'screen_manager') and self.screen_manager.has_screen('hero'):
             skill_definitions = self.screen_manager.get_screen('hero').skill_nodes
             for skill_id, level in self.skill_levels.items():
@@ -257,10 +262,19 @@ class IdleHordeSlayerApp(App):
                 if not skill_data: continue
                 for stat_bonus in skill_data['stats']:
                     stat_type = stat_bonus['type']; value_per_level = stat_bonus['value']
-                    self.character_stats[stat_type] = self.character_stats.get(stat_type, 0) + (value_per_level * level)
+                    if stat_type in base_attributes:
+                        # Wende den Multiplikator aus dem Ability Tree an
+                        multiplier = self.ability_tree_bonuses.get(f"{stat_type}_multiplier", 1.0)
+                        base_attributes[stat_type] += value_per_level * level * multiplier
+                    elif stat_type in self.character_stats:
+                        self.character_stats[stat_type] += value_per_level * level
         for stat, value in self.run_stats.items():
-            self.character_stats[stat] = self.character_stats.get(stat, 0) + value
-        print("Charakter-Stats aktualisiert:", self.character_stats)
+            if stat in base_attributes: base_attributes[stat] += value
+            elif stat in self.character_stats: self.character_stats[stat] += value
+        self.character_stats['max_health'] += base_attributes['strength'] * 5
+        self.character_stats['max_mana'] += base_attributes['intelligence'] * 2
+        self.character_stats['attack_speed_percent'] += base_attributes['dexterity'] * 0.1
+        print("Finale Charakter-Stats:", self.character_stats)
     def _update_background(self, instance, value):
         instance.rect.pos = instance.pos; instance.rect.size = instance.size
 if __name__ == '__main__':
