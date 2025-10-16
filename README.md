@@ -2,68 +2,55 @@
 
 This is an idle game where a hero automatically fights hordes of enemies, and the player focuses on upgrading skills and abilities to make the hero stronger. The project is being developed in Python using the Kivy framework.
 
-## Getting Started
+## Getting Started on Windows
 
-Follow these instructions to get a copy of the project up and running on your local machine for development and testing purposes.
+Follow these instructions to get a copy of the project up and running on your local Windows machine for development and testing.
 
 ### Prerequisites
 
-You need to have Python installed on your computer. You can download it from the official website:
-[python.org](https://www.python.org/downloads/)
+*   **Python:** You need to have Python installed. If you don't have it, download it from [python.org](https://www.python.org/downloads/). Make sure to check the box that says "Add Python to PATH" during installation.
+*   **GitHub Desktop:** You will need [GitHub Desktop](https://desktop.github.com/) to easily clone and manage the project.
 
-You will also need [Git](https://git-scm.com/downloads/) or [GitHub Desktop](https://desktop.github.com/).
+### Installation & Running the Game
 
-### Installation
+1.  **Clone the Repository:**
+    *   Open GitHub Desktop.
+    *   Go to `File` > `Clone Repository`.
+    *   Select the `Idle-Horde-Slayer` repository from the list.
+    *   Choose a suitable folder on your computer (e.g., `C:\Users\YourUser\Documents\GitHub`).
+    *   Click `Clone`.
 
-1.  **Clone the repository:**
+2.  **Open a Command Prompt in the Project Folder:**
+    *   After cloning, GitHub Desktop should show you the project. Click the `Show in Explorer` button.
+    *   In the Explorer window that opens, click in the address bar at the top, type `cmd`, and press `Enter`. This will open a command prompt directly in the project folder.
 
-    *   **Using GitHub Desktop:**
-        1.  In GitHub Desktop, go to `File` > `Clone Repository`.
-        2.  Select the repository for this project.
-        3.  Choose a local path on your computer where you want to save the project.
-        4.  Click `Clone`.
-
-    *   **Using the command line:**
-        ```bash
-        git clone <repository_url>
-        cd <repository_folder>
-        ```
-
-2.  **Set up a virtual environment (Recommended):**
-    Open a terminal or command prompt in the project folder and run:
+3.  **Set Up a Virtual Environment:**
+    *   In the command prompt you just opened, run the following commands one by one:
     ```bash
-    # Create a virtual environment
+    # This creates a virtual environment folder named 'venv'
     python -m venv venv
 
-    # Activate the virtual environment
-    # On Windows:
+    # This activates the virtual environment. You should see (venv) at the start of your prompt line.
     .\venv\Scripts\activate
-    # On macOS/Linux:
-    source venv/bin/activate
     ```
 
-3.  **Install dependencies:**
-    With your virtual environment active, install the required Python packages using the `requirements.txt` file:
+4.  **Install Required Packages:**
+    *   With the virtual environment still active, install all the necessary packages by running:
     ```bash
     pip install -r requirements.txt
     ```
 
-### Running the Game
-
-Once the installation is complete, you can start the game by running the `main.py` script:
-
-```bash
-python main.py
-```
-
-This will launch the game window on your desktop.
+5.  **Run the Game!**
+    *   You're all set! To start the game, simply run:
+    ```bash
+    python main.py
+    ```
+    The game window should appear on your screen.
 
 ## Project Structure
 
 *   `main.py`: The main entry point for the application.
-*   `AGENTS.md`: Instructions for AI agents working on this repository.
 *   `README.md`: This file.
 *   `requirements.txt`: A list of Python dependencies for the project.
-*   `assets/`: Contains all game assets like sprites and sounds.
-*   `docs/`: Contains project design documents.
+*   `assets/`: Contains all game assets like sprites and sounds (currently empty).
 *   `src/`: Contains the core source code for the game logic and entities.
