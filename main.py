@@ -98,19 +98,28 @@ class GameWidget(Widget):
             for enemy in self.enemies[:]:
                 if p.collide_widget(enemy):
                     # Treffer!
-                    self.dispatch('on_enemy_killed')
-                    # Erzeuge einen visuellen Effekt an der Position des Gegners
-                    vfx = VFX(pos=enemy.pos)
-                    self.add_widget(vfx)
+                    enemy.on_hit() # Löse den "Aufleucht"-Effekt aus
 
-                    self.enemies.remove(enemy)
-                    self.remove_widget(enemy)
-
-                    # Entferne das Projektil nach dem Treffer
+                    # Entferne das Projektil sofort
                     if p in self.projectiles:
                         self.projectiles.remove(p)
                         self.remove_widget(p)
+
+                    # Plane das endgültige Entfernen des Gegners und den Todeseffekt
+                    Clock.schedule_once(partial(self.kill_enemy, enemy), 0.1)
+
                     break # Das Projektil kann nur einen Gegner treffen
+
+    def kill_enemy(self, enemy, dt):
+        """Entfernt einen Gegner und erzeugt einen Todeseffekt."""
+        if enemy in self.enemies:
+            self.dispatch('on_enemy_killed')
+            # Erzeuge einen größeren Todeseffekt
+            vfx = VFX(pos=enemy.center, size=(enemy.width*2, enemy.height*2), animation_path='assets/vfx/explosion')
+            self.add_widget(vfx)
+
+            self.enemies.remove(enemy)
+            self.remove_widget(enemy)
 
 # Definition der verschiedenen Screens der App
 class GameScreen(Screen):
