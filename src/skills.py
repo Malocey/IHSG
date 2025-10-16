@@ -1,17 +1,6 @@
 # src/skills.py
 # Definiert die Datenstruktur für den Skillbaum.
 
-# Jeder Skill ist ein Dictionary mit den folgenden Schlüsseln:
-# - id: Eindeutiger Bezeichner für den Skill.
-# - name: Name des Skills, der im UI angezeigt wird.
-# - description: Kurze Beschreibung, was der Skill bewirkt.
-# - base_cost: Die Grundkosten in Skill-Punkten für das erste Level.
-# - max_level: Die maximale Stufe, die dieser Skill erreichen kann.
-# - dependencies: Eine Liste von Skill-IDs, die zuerst freigeschaltet werden müssen.
-# - position: Ein Tupel (x, y) für die Position im Skillbaum-Layout.
-# - stats: Eine Liste von Boni, die dieser Skill pro Level gewährt.
-#   Jeder Bonus ist ein Dictionary mit 'type' (z.B. 'attack_damage') und 'value'.
-
 SKILL_TREE = [
     {
         "id": "base_attack",
@@ -22,7 +11,7 @@ SKILL_TREE = [
         "dependencies": [],
         "position": (100, 500),
         "stats": [
-            {"type": "attack_damage", "value": 1} # Startwert
+            {"type": "attack_damage", "value": 1}
         ]
     },
     {
