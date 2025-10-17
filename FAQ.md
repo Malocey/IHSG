@@ -10,7 +10,7 @@ A: "Idle Horde Slayer" ist ein Idle-Spiel. Der Held kämpft automatisch gegen en
 **F: Wie funktioniert das Upgrade-System?**
 A: Das Spiel kombiniert zwei Systeme:
 1.  **Permanente Upgrades:** Zwischen den Spieldurchläufen können Sie in einem Skill-Tree permanente Boni freischalten.
-2.  **Temporäre Upgrades (In-Run):** Während eines Laufs sammeln Sie XP-Kristalle von besiegten Gegnern. Diese Kristalle können auf dem Spielfeld zu stärkeren Versionen fusionieren, wenn genügend von ihnen nahe beieinander liegen. Bei einem Level-Up erhalten Sie eine Auswahl von drei zufälligen Karten, die mächtige, aber nur für diesen Lauf gültige Boni gewähren.
+2.  **Temporäre Upgrades (In-Run):** Während eines Laufs sammeln Sie XP-Kristalle von besiegten Gegnern. Diese Kristalle können auf dem Spielfeld zu stärkeren Versionen fusionieren. Bei einem Level-Up wird Ihnen eine Auswahl von drei zufälligen Upgrade-Karten präsentiert (z.B. "+15% Schaden"). Ihre Wahl verbessert Ihren Helden sofort für den Rest des aktuellen Durchlaufs.
 
 **F: Kann ich den Helden direkt steuern?**
 A: Nein, das Kernkonzept ist "Idle". Der Held bewegt und kämpft von allein. Der Fokus des Spielers liegt auf strategischen Entscheidungen bei den Upgrades.
