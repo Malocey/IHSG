@@ -9,6 +9,12 @@ from game.player_data import PlayerData
 from game.skill_tree_data import SKILL_TREE_DATA
 
 class IdleHordeSlayerApp(App):
+    _instance = None
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        IdleHordeSlayerApp._instance = self
+
     def build(self):
         self.player_data = PlayerData()
         self.screen_manager = ScreenManager()
@@ -30,7 +36,16 @@ class IdleHordeSlayerApp(App):
         self.temp_speed_percent = 0
 
         self.calculate_stats()
+        Window.bind(on_key_down=self.on_key_down)
         return self.screen_manager
+
+    def on_key_down(self, instance, keyboard, keycode, text, modifiers):
+        if keycode == 40: # Enter
+            Window.screenshot(name='verification.png')
+
+    @staticmethod
+    def get_instance(self):
+        return IdleHordeSlayerApp._instance
 
     def apply_upgrade(self, card_data):
         """

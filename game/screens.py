@@ -2,10 +2,12 @@ import kivy
 from kivy.uix.screenmanager import Screen
 from kivy.uix.label import Label
 from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.scatterlayout import ScatterLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
-from kivy.graphics import Color, Line
+from kivy.graphics import Color, Line, Rectangle
 from kivy.app import App
+from kivy.core.window import Window
 import random
 
 from game.widget import GameWidget
@@ -65,81 +67,191 @@ class CardSelectionScreen(Screen):
 
 from game.skill_tree_data import SKILL_TREE_DATA
 
+class TooltipLabel(Label):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.size_hint = (None, None)
+        self.font_size = '14sp'
+        with self.canvas.before:
+            Color(0.1, 0.1, 0.1, 0.9)
+            self.rect = Rectangle(size=self.size, pos=self.pos)
+        self.bind(size=self._update_rect, pos=self._update_rect)
+
+    def _update_rect(self, instance, value):
+        self.rect.pos = instance.pos
+        self.rect.size = instance.size
+
+class MouseControllable:
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        Window.bind(mouse_pos=self.on_mouse_pos)
+
+    def on_mouse_pos(self, *args):
+        if not self.get_root_window():
+            return
+        pos = args[1]
+        if self.collide_point(*self.to_widget(*pos)):
+            if not self.hovered:
+                self.on_enter()
+                self.hovered = True
+        elif self.hovered:
+            self.on_leave()
+            self.hovered = False
+
+    def on_enter(self):
+        pass
+
+    def on_leave(self):
+        pass
+
+class SkillNodeButton(MouseControllable, Button):
+    hovered = False
+    def __init__(self, node_data, **kwargs):
+        super().__init__(**kwargs)
+        self.node_data = node_data
+
+    def on_enter(self):
+        App.get_running_app().root.get_screen('skill_tree').show_tooltip(self.node_data, self.to_window(self.center_x, self.top))
+
+    def on_leave(self):
+        App.get_running_app().root.get_screen('skill_tree').hide_tooltip()
+
 class SkillTreeScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.layout = FloatLayout()
-        self.add_widget(self.layout)
+        self.root_layout = FloatLayout()
 
-        # Button zum Zurückkehren zum Spiel
+        self.scatter_layout = ScatterLayout(
+            do_rotation=False, do_scale=True, do_translation=True,
+            size_hint=(None, None), size=(3000, 2000)
+        )
+
+        self.skill_tree_layout = FloatLayout()
+        self.scatter_layout.add_widget(self.skill_tree_layout)
+
+        self.root_layout.add_widget(self.scatter_layout)
+        self.add_widget(self.root_layout)
+
         back_button = Button(text="Zurück", size_hint=(None, None), size=(150, 50), pos=(10, 10))
         back_button.bind(on_press=self.back_to_game)
-        self.layout.add_widget(back_button)
+        self.root_layout.add_widget(back_button)
+
+        app = App.get_running_app()
+        self.skill_point_label = Label(
+            text=f"Skill-Punkte: {app.player_data.skill_points if app else 0}",
+            size_hint=(None, None), size=(200, 50)
+        )
+        self.root_layout.add_widget(self.skill_point_label)
+        self.bind(size=self._update_skill_point_label_pos)
+
+        self.tooltip = TooltipLabel(text='')
+        self.tooltip.opacity = 0
+
+    def _update_skill_point_label_pos(self, instance, value):
+        self.skill_point_label.pos = (self.width - 210, 10)
 
     def on_enter(self):
         self.populate_skill_tree()
+        app = App.get_running_app()
+        self.skill_point_label.text = f"Skill-Punkte: {app.player_data.skill_points}"
 
     def populate_skill_tree(self):
-        self.layout.canvas.before.clear()
-        self.layout.clear_widgets()
+        self.skill_tree_layout.canvas.before.clear()
+        self.skill_tree_layout.clear_widgets()
         app = App.get_running_app()
 
-        # Manuelle Positionierung für ein einfaches Layout
         node_positions = {
-            'start_node': (100, 300),
-            'strength_1': (200, 400),
-            'strength_2': (300, 400),
-            'dexterity_1': (200, 200),
-            'dexterity_2': (300, 200),
-            'art_of_the_gladiator': (400, 300),
-            'life_1': (400, 450),
+            # Center
+            'start_node': (1500, 1000),
+            # Strength Path (Top-Left)
+            'strength_1': (1350, 1150), 'strength_2': (1200, 1250),
+            'armor_1': (1050, 1350), 'elemental_resistance_1': (900, 1450),
+            'shield_mastery': (750, 1550),
+            # Dexterity Path (Top-Right)
+            'dexterity_1': (1650, 1150), 'dexterity_2': (1800, 1250),
+            'crit_chance_1': (1950, 1350), 'crit_damage_1': (2100, 1450),
+            'lethal_precision': (2250, 1550),
+            # Intelligence Path (Bottom-Center)
+            'intelligence_1': (1500, 850), 'intelligence_2': (1500, 700),
+            'mana_1': (1500, 550), 'arcane_potency': (1500, 400),
+            # Life Path (Left)
+            'life_1': (1200, 1000), 'life_2': (1000, 1000), 'vitality_1': (800, 1000),
+            # Notable Connections
+            'art_of_the_gladiator': (1500, 1400),
+            # Keystone
+            'keystone_bulwark': (500, 1250),
+            # Loose nodes
+            'attack_speed_1': (1650, 1450),
+            'movement_speed_1': (1800, 1100),
+            'mana_regen_1': (1650, 650),
+            'evasion_1': (2400, 1500),
+            'area_of_effect_1': (1350, 350),
+            'all_attributes_1': (1500, 1550),
         }
+
+        node_widgets = {}
 
         for node_id, node_data in SKILL_TREE_DATA.items():
             is_unlocked = node_id in app.player_data.unlocked_nodes
+            node_type = node_data.get('node_type', 'minor')
+            size, color = self.get_node_style(node_type, is_unlocked)
 
-            # Farbe basierend auf dem Status des Knotens
-            bg_color = (0.2, 0.8, 0.2, 1) if is_unlocked else (0.5, 0.5, 0.5, 1)
-
-            node_button = Button(
+            pos = node_positions.get(node_id, (0, 0))
+            node_button = SkillNodeButton(
+                node_data=node_data,
                 text=node_data['name'],
                 size_hint=(None, None),
-                size=(150, 50),
-                pos=node_positions.get(node_id, (0, 0)),
-                background_color=bg_color
+                size=size,
+                pos=pos,
+                background_normal='',
+                background_color=color
             )
             node_button.bind(on_press=lambda instance, n_id=node_id: self.unlock_node(n_id))
-            self.layout.add_widget(node_button)
+            self.skill_tree_layout.add_widget(node_button)
+            node_widgets[node_id] = node_button
 
-        # Zurück-Button und Skill-Punkt-Anzeige hinzufügen, nachdem die Knoten hinzugefügt wurden
-        back_button = Button(text="Zurück", size_hint=(None, None), size=(150, 50), pos=(10, 10))
-        back_button.bind(on_press=self.back_to_game)
-        self.layout.add_widget(back_button)
-
-        self.skill_point_label = Label(
-            text=f"Skill-Punkte: {app.player_data.skill_points}",
-            size_hint=(None, None),
-            size=(200, 50),
-            pos=(self.width - 210, 10)
-        )
-        self.layout.add_widget(self.skill_point_label)
-
-
-        with self.layout.canvas.before:
+        with self.skill_tree_layout.canvas.before:
             for node_id, node_data in SKILL_TREE_DATA.items():
+                start_widget = node_widgets.get(node_id)
                 for connection_id in node_data.get('connections', []):
-                    # Sicherstellen, dass die Verbindung existiert und Duplikate vermieden werden
-                    if connection_id in SKILL_TREE_DATA and connection_id > node_id:
-                        start_pos = node_positions.get(node_id)
-                        end_pos = node_positions.get(connection_id)
+                    end_widget = node_widgets.get(connection_id)
 
-                        if start_pos and end_pos:
-                            is_active = node_id in app.player_data.unlocked_nodes and \
-                                        connection_id in app.player_data.unlocked_nodes
+                    if start_widget and end_widget:
+                        is_active = node_id in app.player_data.unlocked_nodes and \
+                                    connection_id in app.player_data.unlocked_nodes
+                        color = (0.8, 0.8, 0.2, 1) if is_active else (0.3, 0.3, 0.3, 1)
+                        Color(*color)
+                        Line(points=[start_widget.center_x, start_widget.center_y, end_widget.center_x, end_widget.center_y], width=2)
 
-                            color = (0.8, 0.8, 0.2, 1) if is_active else (0.3, 0.3, 0.3, 1)
-                            Color(*color)
-                            Line(points=[start_pos[0] + 75, start_pos[1] + 25, end_pos[0] + 75, end_pos[1] + 25], width=2)
+    def show_tooltip(self, node_data, pos):
+        self.tooltip.text = f"{node_data['name']}\n\n{node_data['description']}\nKosten: {node_data.get('cost', 1)}"
+        self.tooltip.texture_update()
+        self.tooltip.size = self.tooltip.texture_size
+        self.tooltip.pos = (pos[0] - self.tooltip.width / 2, pos[1] + 10)
+
+        if self.tooltip not in self.root_layout.children:
+            self.root_layout.add_widget(self.tooltip)
+        self.tooltip.opacity = 1
+
+    def hide_tooltip(self):
+        self.tooltip.opacity = 0
+        if self.tooltip in self.root_layout.children:
+            self.root_layout.remove_widget(self.tooltip)
+
+    def get_node_style(self, node_type, is_unlocked):
+        if node_type == 'keystone':
+            size = (140, 140)
+            color = (1.0, 0.2, 0.2, 1) if is_unlocked else (0.6, 0.1, 0.1, 1)
+        elif node_type == 'start':
+            size = (120, 120)
+            color = (0.7, 0.5, 0.9, 1) if is_unlocked else (0.4, 0.3, 0.5, 1)
+        elif node_type == 'notable':
+            size = (100, 100)
+            color = (0.9, 0.7, 0.2, 1) if is_unlocked else (0.5, 0.4, 0.1, 1)
+        else:  # minor
+            size = (60, 60)
+            color = (0.2, 0.8, 0.2, 1) if is_unlocked else (0.5, 0.5, 0.5, 1)
+        return size, color
 
 
     def unlock_node(self, node_id):
@@ -193,6 +305,7 @@ class SkillTreeScreen(Screen):
 
         # UI aktualisieren
         self.populate_skill_tree()
+        self.skill_point_label.text = f"Skill-Punkte: {app.player_data.skill_points}"
 
 
     def back_to_game(self, instance):
