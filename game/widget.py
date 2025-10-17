@@ -163,7 +163,8 @@ class GameWidget(Widget):
                     self.enemies.remove(enemy)
                     self.remove_widget(enemy)
 
-        # Sammelt XP-Kristalle auf
+        # Sammelt XP-Kristalle auf und prüft auf Fusion
+        self.check_crystal_fusion()
         for crystal in self.xp_crystals[:]:
             # Kristalle bewegen sich auf den Helden zu
             direction = self.hero.center_x - crystal.center_x, self.hero.center_y - crystal.center_y
@@ -178,10 +179,54 @@ class GameWidget(Widget):
             if self.hero.collide_widget(crystal):
                 self.xp_crystals.remove(crystal)
                 self.remove_widget(crystal)
-                self.xp += 1
+                self.xp += crystal.xp_value
                 print(f"XP gesammelt: {self.xp}/{self.xp_to_next_level}")
                 if self.xp >= self.xp_to_next_level:
                     self.level_up()
+
+    def check_crystal_fusion(self):
+        """
+        Prüft, ob XP-Kristalle fusioniert werden können.
+        """
+        crystals_by_tier = {}
+        for crystal in self.xp_crystals:
+            if crystal.tier not in crystals_by_tier:
+                crystals_by_tier[crystal.tier] = []
+            crystals_by_tier[crystal.tier].append(crystal)
+
+        for tier, crystals in crystals_by_tier.items():
+            if len(crystals) < 5:
+                continue
+
+            # Finde Gruppen von 5 Kristallen, die nahe beieinander liegen
+            for i in range(len(crystals) - 4):
+                group_to_fuse = [crystals[i]]
+                for j in range(i + 1, len(crystals)):
+                    if len(group_to_fuse) < 5:
+                        # Prüfe Distanz zum ersten Kristall der potenziellen Gruppe
+                        dist_x = crystals[j].center_x - group_to_fuse[0].center_x
+                        dist_y = crystals[j].center_y - group_to_fuse[0].center_y
+                        if (dist_x**2 + dist_y**2)**0.5 < 100: # Fusions-Radius
+                            group_to_fuse.append(crystals[j])
+
+                if len(group_to_fuse) >= 5:
+                    # Fusion durchführen
+                    avg_x = sum(c.center_x for c in group_to_fuse) / 5
+                    avg_y = sum(c.center_y for c in group_to_fuse) / 5
+
+                    # Alten Kristalle entfernen
+                    for c in group_to_fuse:
+                        self.xp_crystals.remove(c)
+                        self.remove_widget(c)
+
+                    # Neuen, höherstufigen Kristall erstellen
+                    new_crystal = XPCrystal(tier=tier + 1, center=(avg_x, avg_y))
+                    self.xp_crystals.append(new_crystal)
+                    self.add_widget(new_crystal)
+
+                    # Nach einer Fusion die Prüfung für diesen Frame beenden, um Komplexität zu reduzieren
+                    return
+
 
     def on_enemy_death(self, enemy):
         """

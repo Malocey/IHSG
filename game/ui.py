@@ -55,16 +55,28 @@ class DamageNumber(Label):
         if self.parent:
             self.parent.remove_widget(self)
 
+# Farben für verschiedene Kristall-Stufen
+CRYSTAL_COLORS = [
+    (0.2, 0.8, 1, 0.9),  # Stufe 0 (Cyan)
+    (0.5, 1, 0.5, 0.9),  # Stufe 1 (Hellgrün)
+    (1, 1, 0.5, 0.9),  # Stufe 2 (Gelb)
+    (1, 0.5, 0.5, 0.9),  # Stufe 3 (Rot)
+    (1, 0.5, 1, 0.9),  # Stufe 4 (Magenta)
+]
+
 class XPCrystal(Widget):
     """
     Ein XP-Kristall, der von Gegnern fallen gelassen und vom Helden eingesammelt wird.
     """
-    def __init__(self, **kwargs):
+    def __init__(self, tier=0, **kwargs):
         super().__init__(**kwargs)
-        self.size = (15, 15)
+        self.tier = tier
+        self.xp_value = 5 ** tier
+        self.size = (15 + tier * 3, 15 + tier * 3) # Größer mit jeder Stufe
         self.velocity = (0, 0)
         with self.canvas:
-            Color(0.2, 0.8, 1, 0.9)  # Helle, cyan-ähnliche Farbe
+            color = CRYSTAL_COLORS[self.tier % len(CRYSTAL_COLORS)]
+            Color(*color)
             self.rect = Rectangle(size=self.size, pos=self.pos)
 
         self.bind(pos=self._update_rect)

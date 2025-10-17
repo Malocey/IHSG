@@ -66,11 +66,11 @@ Das Haupt-Widget, das die gesamte Spiellogik steuert.
 
 ### In-Run-Progression (XP und Level-Up)
 
-- Besiegte Gegner lassen `XPCrystal`-Objekte fallen.
-- Diese Kristalle bewegen sich langsam auf den Helden zu, um das Einsammeln zu erleichtern.
-- Bei Kollision mit dem Helden wird das `xp`-Attribut im `GameWidget` erhöht.
-- Erreicht `xp` den Wert `xp_to_next_level`, wird die `level_up()`-Methode aufgerufen.
-- `level_up()` erhöht das Spielerlevel, setzt die XP zurück, erhöht die für das nächste Level benötigten XP und wechselt zum `CardSelectionScreen`.
+- Besiegte Gegner lassen `XPCrystal`-Objekte der Stufe 0 fallen.
+- Kristalle bewegen sich langsam auf den Helden zu.
+- **Kristall-Fusion:** Wenn 5 oder mehr Kristalle derselben Stufe nahe beieinander liegen, werden sie zu einem einzigen Kristall der nächsthöheren Stufe fusioniert. Dieser neue Kristall ist 5-mal so viel wert und wird zur besseren Erkennung größer und in einer anderen Farbe dargestellt.
+- Beim Einsammeln erhält der Spieler den entsprechenden XP-Wert des Kristalls.
+- Erreicht die Gesamt-XP den Schwellenwert, wird ein Level-Up ausgelöst und der `CardSelectionScreen` angezeigt.
 
 ## 5. Visuelle Effekte ("Juice")
 
