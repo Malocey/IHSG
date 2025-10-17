@@ -1,102 +1,57 @@
 import kivy
-kivy.require('2.1.0') # Ensure compatibility
+kivy.require('2.3.0') # Ensure compatibility
 
 from kivy.app import App
-from kivy.uix.widget import Widget
-from kivy.clock import Clock
-from kivy.graphics import Rectangle
-from kivy.core.image import Image as CoreImage
-import random
+from kivy.uix.screenmanager import ScreenManager
 
-class Sprite(Widget):
-    def __init__(self, image_path, **kwargs):
-        super().__init__(**kwargs)
-        with self.canvas:
-            self.texture = CoreImage(image_path).texture
-            self.rect = Rectangle(texture=self.texture, pos=self.pos, size=self.size)
-        self.bind(pos=self.update_rect, size=self.update_rect)
-
-    def update_rect(self, *args):
-        self.rect.pos = self.pos
-        self.rect.size = self.size
-
-class Hero(Sprite):
-    def __init__(self, **kwargs):
-        super().__init__(image_path='assets/hero/hero.png', **kwargs)
-        self.size = (48, 48) # Upscaled for visibility
-
-class Enemy(Sprite):
-    def __init__(self, **kwargs):
-        super().__init__(image_path='assets/enemy/enemy.png', **kwargs)
-        self.size = (32, 32) # Upscaled for visibility
-
-class Projectile(Sprite):
-    def __init__(self, **kwargs):
-        super().__init__(image_path='assets/projectile/projectile.png', **kwargs)
-        self.size = (24, 24)
-
-    def move(self, dt):
-        self.y += 300 * dt
-
-class GameWidget(Widget):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.hero = Hero(pos=(375, 50))
-        self.add_widget(self.hero)
-
-        self.enemies = []
-        self.projectiles = []
-
-        Clock.schedule_interval(self.update, 1.0 / 60.0)
-        Clock.schedule_interval(self.spawn_enemy, 2.0)
-        Clock.schedule_interval(self.shoot, 0.5)
-
-    def spawn_enemy(self, dt):
-        enemy = Enemy()
-        enemy.x = random.randint(0, self.width - enemy.width)
-        enemy.y = self.height
-        self.enemies.append(enemy)
-        self.add_widget(enemy)
-
-    def shoot(self, dt):
-        projectile = Projectile()
-        projectile.center_x = self.hero.center_x
-        projectile.y = self.hero.top
-        self.projectiles.append(projectile)
-        self.add_widget(projectile)
-
-    def update(self, dt):
-        # Move hero
-        self.hero.x += 100 * dt
-        if self.hero.right > self.width or self.hero.x < 0:
-            self.hero.x = 0
-
-        # Move projectiles and check for collisions
-        for p in self.projectiles[:]:
-            p.move(dt)
-            if p.y > self.height:
-                self.projectiles.remove(p)
-                self.remove_widget(p)
-                continue
-
-            for enemy in self.enemies[:]:
-                if p.collide_widget(enemy):
-                    self.enemies.remove(enemy)
-                    self.remove_widget(enemy)
-                    self.projectiles.remove(p)
-                    self.remove_widget(p)
-                    break
-
-        # Move enemies
-        for enemy in self.enemies[:]:
-            enemy.y -= 100 * dt
-            if enemy.top < 0:
-                self.enemies.remove(enemy)
-                self.remove_widget(enemy)
+from game.screens import GameScreen, CardSelectionScreen
 
 class IdleHordeSlayerApp(App):
     def build(self):
-        return GameWidget()
+        self.screen_manager = ScreenManager()
+
+        game_screen = GameScreen(name='game')
+        self.screen_manager.add_widget(game_screen)
+
+        card_selection_screen = CardSelectionScreen(name='card_selection')
+        self.screen_manager.add_widget(card_selection_screen)
+
+        # Die Referenz auf das GameWidget speichern, um darauf zugreifen zu können
+        self.game_widget = game_screen.game_widget
+
+        self.calculate_stats()
+        return self.screen_manager
+
+    def calculate_stats(self):
+        """
+        Berechnet die finalen Spielerstatistiken basierend auf permanenten und temporären Boni.
+        Diese Funktion wird aufgerufen, wenn sich Werte ändern (z.B. durch Upgrades).
+        """
+        # Platzhalter für Boni aus dem Skill-Tree und In-Run-Upgrades
+        permanent_damage_bonus = 0
+        permanent_speed_bonus = 0
+        temp_damage_bonus = 0
+        temp_speed_bonus = 0
+
+        # Basiswerte
+        base_attack_damage = 10
+        base_hero_speed = 100
+        base_attack_speed = 0.5  # Sekunden pro Schuss
+
+        # Berechnung der finalen Werte
+        self.attack_damage = base_attack_damage + permanent_damage_bonus + temp_damage_bonus
+        self.hero_speed = base_hero_speed + permanent_speed_bonus + temp_speed_bonus
+
+        # Angriffsgeschwindigkeit wird als Cooldown berechnet (weniger ist besser)
+        attack_speed_percent_bonus = 0 # z.B. 0.1 für 10% schneller
+        self.attack_cooldown = base_attack_speed / (1 + attack_speed_percent_bonus)
+
+        # Aktualisiert die Werte im Spiel
+        self.game_widget.update_hero_stats(
+            damage=self.attack_damage,
+            speed=self.hero_speed,
+            attack_cooldown=self.attack_cooldown
+        )
 
 if __name__ == '__main__':
     IdleHordeSlayerApp().run()
