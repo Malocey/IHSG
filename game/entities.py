@@ -8,6 +8,7 @@ from kivy.clock import Clock
 from game.animation import AnimatedSprite, SpriteManager
 from game.ui import HealthBar
 from game.effects import TrailParticle
+from game.item_data import ITEM_DATA
 
 class Hero(AnimatedSprite):
     def __init__(self, **kwargs):
@@ -17,7 +18,10 @@ class Hero(AnimatedSprite):
         self.size = (96, 96)
         self.add_animation('walk_side', frame_indices=list(range(6)), frame_rate=1.0/10.0)
         self.set_animation('walk_side')
-        self.attack_damage = 10  # Platzhalter-Wert
+        self.attack_damage = 10
+        self.max_health = 100
+        self.health = self.max_health
+        self.armor = 0
 
 
 class Enemy(AnimatedSprite):
@@ -76,6 +80,13 @@ class Enemy(AnimatedSprite):
             if self.parent:
                 self.parent.add_widget(soul_essence)
 
+        # Loot-Drop-Logik
+        if random.random() < 0.05: # 5% Chance, ein Item fallen zu lassen
+            random_item_id = random.choice(list(ITEM_DATA.keys()))
+            loot_drop = LootDrop(item_id=random_item_id, center=self.center)
+            if self.parent:
+                self.parent.add_widget(loot_drop)
+
         # Todesanimation starten
         self.set_animation('die', loop=False, on_end=on_death_callback)
 
@@ -92,6 +103,29 @@ class GoldCoin(Widget):
         with self.canvas:
             texture = CoreImage('assets/items/GoldCoin.png').texture
             self.rect = Rectangle(texture=texture, pos=self.pos, size=self.size)
+        self.bind(pos=self._update_rect)
+
+    def _update_rect(self, *args):
+        self.rect.pos = self.pos
+
+
+class LootDrop(Widget):
+    """
+    Ein fallengelassener Ausrüstungsgegenstand.
+    """
+    def __init__(self, item_id, **kwargs):
+        super().__init__(**kwargs)
+        self.item_id = item_id
+        self.size = (32, 32) # Größer als Währungen, um es hervorzuheben
+
+        # Grafik basierend auf Seltenheit
+        rarity = ITEM_DATA[item_id]['rarity']
+        color = {'common': (1, 1, 1, 1), 'uncommon': (0.2, 1, 0.2, 1)}.get(rarity, (1, 1, 1, 1))
+
+        with self.canvas:
+            Color(*color)
+            # Platzhalter-Grafik, später vielleicht durch Item-Grafiken ersetzen
+            self.rect = Rectangle(source='assets/items/LootBag.png', pos=self.pos, size=self.size)
         self.bind(pos=self._update_rect)
 
     def _update_rect(self, *args):

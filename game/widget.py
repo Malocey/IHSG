@@ -6,7 +6,7 @@ from kivy.app import App
 from kivy.animation import Animation
 import random
 
-from game.entities import Hero, Enemy, Projectile, GoldCoin, SoulEssence
+from game.entities import Hero, Enemy, Projectile, GoldCoin, SoulEssence, LootDrop
 from game.ui import DamageNumber, XPCrystal
 from game.config import WAVE_CONFIG
 from game.effects import ParticleSystem
@@ -49,12 +49,19 @@ class GameWidget(Widget):
         Clock.schedule_interval(self.update, 1.0 / 60.0)
         self.start_next_wave()
 
-    def update_hero_stats(self, damage, speed, attack_cooldown):
+    def update_hero_stats(self, damage, speed, attack_cooldown, max_health, armor):
         """
         Wird von der App-Klasse aufgerufen, um die Werte des Helden zu aktualisieren.
         """
         self.hero.attack_damage = damage
-        self.hero_speed = speed
+        self.hero.speed = speed
+        self.hero.armor = armor
+
+        # Nur max_health aktualisieren, wenn es sich geändert hat, um Heilung zu vermeiden
+        if self.hero.max_health != max_health:
+            health_percentage = self.hero.health / self.hero.max_health if self.hero.max_health > 0 else 1
+            self.hero.max_health = max_health
+            self.hero.health = self.hero.max_health * health_percentage
 
         # Planen des Schießens neu starten, um den neuen Cooldown zu verwenden
         if self.shoot_event:
@@ -202,7 +209,7 @@ class GameWidget(Widget):
                 if self.xp >= self.xp_to_next_level:
                     self.level_up()
 
-        # Sammelt Goldmünzen und Seelenessenz auf
+        # Sammelt Goldmünzen, Seelenessenz und Loot auf
         for item in self.children[:]:
             if self.hero.collide_widget(item):
                 app = App.get_running_app()
@@ -214,6 +221,9 @@ class GameWidget(Widget):
                 elif isinstance(item, SoulEssence):
                     app.player_data.soul_essence += item.value
                     self.soul_essence_label.text = f"Essenz: {app.player_data.soul_essence}"
+                    self.remove_widget(item)
+                elif isinstance(item, LootDrop):
+                    app.player_data.add_item_to_inventory(item.item_id)
                     self.remove_widget(item)
 
                 app.player_data.save_data()

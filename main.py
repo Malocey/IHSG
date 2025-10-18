@@ -5,7 +5,7 @@ from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager
 from kivy.core.window import Window
 
-from game.screens import GameScreen, CardSelectionScreen, SkillTreeScreen, CityScreen, ShopScreen
+from game.screens import GameScreen, CardSelectionScreen, SkillTreeScreen, CityScreen, ShopScreen, EquipmentScreen, SettingsScreen
 from game.player_data import PlayerData
 from game.skill_tree_data import SKILL_TREE_DATA
 
@@ -34,6 +34,12 @@ class IdleHordeSlayerApp(App):
 
         shop_screen = ShopScreen(name='shop')
         self.screen_manager.add_widget(shop_screen)
+
+        equipment_screen = EquipmentScreen(name='equipment')
+        self.screen_manager.add_widget(equipment_screen)
+
+        settings_screen = SettingsScreen(name='settings')
+        self.screen_manager.add_widget(settings_screen)
 
         self.game_widget = game_screen.game_widget
 
@@ -71,59 +77,78 @@ class IdleHordeSlayerApp(App):
         self.calculate_stats()
 
 from game.config import SHOP_UPGRADES
+from game.item_data import ITEM_DATA
 
 # ... (rest of the file)
 
     def calculate_stats(self):
         """
-        Berechnet die finalen Spielerstatistiken basierend auf permanenten Boni aus Skills und Shop.
+        Berechnet die finalen Spielerstatistiken basierend auf allen permanenten Boni.
         """
-        # Permanente Boni aus dem Skill-Tree
+        # Basiswerte für Boni
         perm_strength = 0
         perm_dexterity = 0
+        perm_intelligence = 0
         perm_attack_speed_percent = 0
-        # ... (andere Boni aus dem Skill-Tree)
+        perm_max_health = 0
+        perm_armor = 0
 
+        # 1. Boni aus dem Skill-Tree
         for node_id in self.player_data.unlocked_nodes:
             node = SKILL_TREE_DATA.get(node_id)
-            if not node:
-                continue
+            if not node: continue
 
-            if node.get('bonus_type') == 'strength':
-                perm_strength += node.get('value', 0)
-            elif node.get('bonus_type') == 'dexterity':
-                perm_dexterity += node.get('value', 0)
+            # Einfache Boni
+            if node.get('bonus_type') == 'strength': perm_strength += node.get('value', 0)
+            elif node.get('bonus_type') == 'dexterity': perm_dexterity += node.get('value', 0)
+            # ... weitere einfache Boni hier ...
 
-            if node.get('node_type') == 'notable':
-                for bonus in node.get('bonuses', []):
-                    if bonus['type'] == 'attack_speed_percent':
-                        perm_attack_speed_percent += bonus['value']
-                    # ... (weitere notable Boni)
+            # Komplexe Boni (Notables, Keystones)
+            for bonus in node.get('bonuses', []):
+                if bonus['type'] == 'attack_speed_percent': perm_attack_speed_percent += bonus.get('value', 0)
+                elif bonus['type'] == 'dexterity': perm_dexterity += bonus.get('value', 0)
+                # ... weitere komplexe Boni ...
 
-        # Permanente Boni aus dem Shop
+        # 2. Boni aus der Ausrüstung
+        for slot, unique_id in self.player_data.equipment.items():
+            item_id = self.player_data.inventory.get(unique_id)
+            if not item_id: continue
+
+            item_data = ITEM_DATA.get(item_id)
+            if not item_data: continue
+
+            for bonus_type, bonus_value in item_data.get('bonuses', {}).items():
+                if bonus_type == 'strength': perm_strength += bonus_value
+                elif bonus_type == 'dexterity': perm_dexterity += bonus_value
+                elif bonus_type == 'intelligence': perm_intelligence += bonus_value
+                elif bonus_type == 'max_health': perm_max_health += bonus_value
+                elif bonus_type == 'armor': perm_armor += bonus_value
+                elif bonus_type == 'attack_speed_percent': perm_attack_speed_percent += bonus_value
+
+        # 3. Boni aus dem Shop (Meta-Boni)
         self.gold_find_percent = 0
         self.xp_gain_percent = 0
         self.shop_price_percent = 0
 
         for upgrade_id, level in self.player_data.shop_upgrades.items():
             upgrade_data = SHOP_UPGRADES.get(upgrade_id)
-            if not upgrade_data:
-                continue
+            if not upgrade_data: continue
 
             bonus_value = upgrade_data['bonus_per_level'] * level
-            if upgrade_data['bonus_type'] == 'gold_find_percent':
-                self.gold_find_percent += bonus_value
-            elif upgrade_data['bonus_type'] == 'xp_gain_percent':
-                self.xp_gain_percent += bonus_value
-            elif upgrade_data['bonus_type'] == 'shop_price_percent':
-                self.shop_price_percent += bonus_value
+            if upgrade_data['bonus_type'] == 'gold_find_percent': self.gold_find_percent += bonus_value
+            elif upgrade_data['bonus_type'] == 'xp_gain_percent': self.xp_gain_percent += bonus_value
+            elif upgrade_data['bonus_type'] == 'shop_price_percent': self.shop_price_percent += bonus_value
 
         # Basiswerte
         base_attack_damage = 10
         base_hero_speed = 100
         base_attack_speed = 0.5
+        base_max_health = 100
+        base_armor = 0
 
         # Berechnung der finalen Werte
+        self.max_health = (base_max_health + perm_max_health)
+        self.armor = base_armor + perm_armor
         self.attack_damage = (base_attack_damage + perm_strength) * (1 + self.temp_damage_percent)
         self.hero_speed = (base_hero_speed + perm_dexterity) * (1 + self.temp_speed_percent)
         self.attack_cooldown = base_attack_speed / (1 + perm_attack_speed_percent + self.temp_attack_speed_percent)
@@ -133,7 +158,9 @@ from game.config import SHOP_UPGRADES
             self.game_widget.update_hero_stats(
                 damage=self.attack_damage,
                 speed=self.hero_speed,
-                attack_cooldown=self.attack_cooldown
+                attack_cooldown=self.attack_cooldown,
+                max_health=self.max_health,
+                armor=self.armor
             )
 
 if __name__ == '__main__':

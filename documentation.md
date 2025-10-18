@@ -4,76 +4,68 @@ Dieses Dokument bietet einen technischen Überblick über die Struktur und die K
 
 ## 1. Projektstruktur
 
-Das Projekt ist in einer einzigen Python-Datei (`main.py`) organisiert, die alle Spiel-Logik enthält. Die visuellen Assets sind im `assets`-Verzeichnis untergebracht.
+Das Projekt ist modular aufgebaut und befindet sich hauptsächlich im `game`-Paket.
 
-- `main.py`: Enthält die Kivy-App, die Spiel-Widgets und die gesamte Logik für Charaktere, Gegner und Animationen.
-- `assets/`: Beinhaltet alle visuellen Ressourcen wie Sprite-Sheets für Helden, Gegner und Umgebungsobjekte.
-- `requirements.txt`: Listet alle notwendigen Python-Bibliotheken auf.
-- `build.spec` / `build_windows.bat`: Skripte zur Erstellung einer ausführbaren Windows-Datei.
+- `main.py`: Enthält die Kivy-App-Klasse (`IdleHordeSlayerApp`), die den `ScreenManager` initialisiert und die zentrale `calculate_stats`-Logik enthält.
+- `game/`: Das Hauptpaket für die Spiellogik.
+  - `screens.py`: Definiert alle Bildschirme der App (`GameScreen`, `SkillTreeScreen`, `CityScreen`, `ShopScreen`, `EquipmentScreen`, `SettingsScreen`).
+  - `entities.py`: Enthält Klassen für alle Spielobjekte wie `Hero`, `Enemy`, `Projectile` und Sammelitems (`GoldCoin`, `SoulEssence`, `LootDrop`).
+  - `widget.py`: Definiert das `GameWidget`, das die Haupt-Gameplay-Schleife und die Kollisionserkennung steuert.
+  - `player_data.py`: Verwaltet das Speichern und Laden aller permanenten Spielerdaten (`player_save.json`).
+  - `item_data.py`: Definiert alle Ausrüstungsgegenstände und ihre Boni.
+  - `config.py`: Enthält Konfigurationen für Wellen, In-Run-Upgrades und Shop-Upgrades.
+- `assets/`: Beinhaltet alle visuellen Ressourcen.
 
-## 2. Das Animationssystem
+## 2. Gameplay-Systeme
 
-Das Herzstück der visuellen Darstellung ist ein flexibles, auf Sprite-Sheets basierendes Animationssystem. Es besteht aus zwei Hauptklassen:
+### Meta-Progression
 
-### `SpriteManager`
+Das Spiel verfügt über mehrere ineinandergreifende Systeme für die langfristige Spielerprogression.
 
-Diese Klasse ist für das Laden und Verwalten von Sprite-Sheets verantwortlich.
+#### a) Währungen
 
-- **Konstruktor (`__init__`)**: Nimmt den Pfad zu einem Sprite-Sheet sowie die Breite und Höhe eines einzelnen Frames entgegen.
-- **`_slice_sheet()`**: Eine interne Methode, die das Sheet automatisch in einzelne, speicheroptimierte Kivy-Texturen (`TextureRegion`) zerlegt. Dies geschieht nur einmal beim Laden, um die Performance zu maximieren.
-- **`add_animation()`**: Ermöglicht die Definition einer benannten Animation (z.B. 'walk', 'idle', 'death') durch die Angabe einer Sequenz von Frame-Indizes und einer Abspielgeschwindigkeit (`frame_rate`).
+- **Gold:** Eine häufige Währung, die von den meisten Gegnern fallen gelassen wird. Wird für permanente Upgrades im Shop verwendet.
+- **Seelenessenz:** Eine seltene Währung, die nur gelegentlich von Gegnern fallen gelassen wird. Ihre Verwendung ist für zukünftige Features (z.B. Crafting) geplant.
+- **Skill-Punkte:** Werden durch Gameplay-Erfolge (Mechanik noch zu definieren) erlangt und im Skill-Tree ausgegeben.
 
-### `AnimatedSprite`
+#### b) Skill-Tree (`SkillTreeScreen`)
 
-Dies ist die Basisklasse für alle animierten Objekte im Spiel (wie `Hero` und `Enemy`).
+- Ein umfangreicher, passiver Skill-Tree zur permanenten Verbesserung von Charakterwerten.
+- **Navigation:** Der Baum ist frei scroll- und zoombar, implementiert mit einem `ScatterLayout`.
+- **Knotentypen:** Knoten sind visuell nach ihrer Wertigkeit unterschieden (`start`, `minor`, `notable`, `keystone`).
+- **Tooltips:** Beim Überfahren eines Knotens mit der Maus werden dessen Name, Beschreibung und Kosten angezeigt.
 
-- **Konstruktor (`__init__`)**: Erstellt eine Instanz des `SpriteManager`, um die Animationsdaten zu verwalten.
-- **`set_animation(name, loop, on_end)`**: Wechselt die aktive Animation.
-  - `loop` (bool): Bestimmt, ob die Animation in einer Schleife abgespielt wird.
-  - `on_end` (callable): Eine optionale Callback-Funktion, die am Ende einer nicht-loopenden Animation ausgeführt wird. Dies ist entscheidend für Zustandsübergänge, wie z.B. das Entfernen eines Gegners nach seiner Todesanimation.
-- **`update_animation(dt)`**: Diese Methode wird in jedem Frame des Spiels aufgerufen und aktualisiert den aktuellen Frame der Animation basierend auf der vergangenen Zeit (`dt`). Sie steuert das Timing und die Logik für Looping und Callbacks.
+#### c) Ausrüstung & Loot (`EquipmentScreen`)
 
-## 3. Spiel-Entitäten
+- Gegner haben eine geringe Chance, Ausrüstungsgegenstände fallen zu lassen (`LootDrop`).
+- Aufgesammelte Items landen im **Inventar** des Spielers.
+- Im `EquipmentScreen` können Spieler Items aus dem Inventar in spezifische **Ausrüstungsslots** (`weapon`, `helmet`, `chest`, etc.) legen.
+- Angelegte Ausrüstung gewährt permanente Boni, die in die `calculate_stats`-Logik einfließen.
 
-### `Hero` und `Enemy`
+#### d) Permanenter Upgrade-Shop (`ShopScreen`)
 
-Beide Klassen erben von `AnimatedSprite` und sind somit animierbar.
-
-- Im Konstruktor jeder Klasse werden die spezifischen Sprite-Sheets geladen und die jeweiligen Animationen (z.B. Laufen, Sterben) definiert.
-- Die `Enemy`-Klasse verfügt über eine `die()`-Methode, die die Todesanimation startet und sicherstellt, dass das Objekt erst nach Abschluss der Animation aus dem Spiel entfernt wird.
-
-### `GameWidget`
-
-Das Haupt-Widget, das die gesamte Spiellogik steuert.
-
-- **`update(dt)`-Methode**: Ruft `update_animation(dt)` für alle aktiven animierten Objekte auf.
-- **Kollisionserkennung**: Löst die `die()`-Methode eines Gegners aus, anstatt ihn sofort zu entfernen, um einen sauberen visuellen Übergang zu gewährleisten.
-- **`on_enemy_death(enemy)`**: Eine Callback-Methode, die von der `AnimatedSprite`-Klasse aufgerufen wird, um das Gegnerobjekt endgültig aus dem Speicher und von der Anzeige zu entfernen.
-
-## 4. Gameplay-Systeme
-
-### Wellen-System (`game/config.py`)
-
-- Die Gegner erscheinen in Wellen, die in der `WAVE_CONFIG`-Konstante definiert sind.
-- Jede Welle hat eine Dauer, eine Liste von möglichen Gegnertypen, eine maximale Gegneranzahl und ein Spawn-Intervall.
-- Die `start_next_wave()`-Methode im `GameWidget` steuert den Übergang zwischen den Wellen und erhöht den Schwierigkeitsgrad, indem die Lebenspunkte neuer Gegner mit jeder Runde durch die Konfiguration multipliziert werden.
-
-### Statistik-System
-
-- Die `IdleHordeSlayerApp`-Klasse enthält eine `calculate_stats()`-Methode, die als zentrale Anlaufstelle für die Berechnung aller spielrelevanten Werte dient.
-- Aktuell sind die Boni noch Platzhalter, aber das System ist darauf ausgelegt, Werte aus verschiedenen Quellen (z.B. Skill-Tree, temporäre Upgrades) zu kombinieren.
-- Die berechneten Werte (Schaden, Geschwindigkeit, Angriffs-Cooldown) werden an das `GameWidget` übergeben und beeinflussen direkt das Verhalten des Helden.
+- In der "Stadt" kann der Spieler einen Händler besuchen.
+- Im Shop kann Gold für dauerhafte, prozentuale Boni ausgegeben werden (z.B. "+X% mehr Gold-Drops", "+Y% mehr XP-Gewinn").
+- Die Kosten für Shop-Upgrades steigen mit jedem gekauften Level exponentiell an.
 
 ### In-Run-Progression (XP und Level-Up)
 
-- Besiegte Gegner lassen `XPCrystal`-Objekte der Stufe 0 fallen.
-- Kristalle bewegen sich langsam auf den Helden zu.
-- **Kristall-Fusion:** Wenn 5 oder mehr Kristalle derselben Stufe nahe beieinander liegen, werden sie zu einem einzigen Kristall der nächsthöheren Stufe fusioniert. Dieser neue Kristall ist 5-mal so viel wert und wird zur besseren Erkennung größer und in einer anderen Farbe dargestellt.
-- Beim Einsammeln erhält der Spieler den entsprechenden XP-Wert des Kristalls.
-- Erreicht die Gesamt-XP den Schwellenwert, wird ein Level-Up ausgelöst und der `CardSelectionScreen` angezeigt.
-- Der `CardSelectionScreen` zeigt drei zufällige Upgrade-Karten aus `game/config.py` an. Bei Auswahl wird die `apply_upgrade`-Methode der App aufgerufen, die den entsprechenden temporären Bonus erhöht und die `calculate_stats`-Methode zur Neuberechnung der Heldenwerte aufruft.
+- Besiegte Gegner lassen `XPCrystal`-Objekte fallen.
+- **Kristall-Fusion:** 5 oder mehr Kristalle derselben Stufe fusionieren zu einem Kristall der nächsthöheren Stufe, der mehr XP wert ist.
+- Bei einem Level-Up wird der `CardSelectionScreen` angezeigt, auf dem der Spieler aus drei zufälligen, temporären Upgrades für den aktuellen Run wählen kann.
 
-## 5. Visuelle Effekte ("Juice")
+### Statistik-System (`calculate_stats` in `main.py`)
 
-- **`DamageNumber`**: Eine Klasse, die auf dem Bildschirm schwebende Schadenszahlen erzeugt, wenn ein Gegner getroffen wird. Sie nutzt Kivy's `Animation`-Klasse, um nach oben zu schweben und zu verblassen.
-- **`screen_shake()`**: Eine Methode im `GameWidget`, die durch eine schnelle Sequenz von Positionsänderungen der gesamten Spiel-Leinwand einen Schütteleffekt erzeugt. Dieser wird ausgelöst, wenn ein Gegner stirbt, um dem Kampf mehr Wucht zu verleihen.
+- Dies ist die zentrale Methode zur Berechnung der finalen Spielerwerte.
+- Sie aggregiert Boni aus drei permanenten Quellen:
+  1.  Freigeschaltete Knoten im **Skill-Tree**.
+  2.  Angelegte **Ausrüstung**.
+  3.  Gekaufte Upgrades im **Shop**.
+- Anschließend werden temporäre Boni aus der In-Run-Progression auf diese permanenten Werte aufgeschlagen.
+- Das Ergebnis wird an das `GameWidget` und den `Hero` übergeben, um das Gameplay direkt zu beeinflussen.
+
+## 3. Speicherstands-Verwaltung (`SettingsScreen`)
+
+- Um das Übertragen von Spielständen zwischen Geräten zu ermöglichen, wurde eine manuelle Export/Import-Funktion implementiert.
+- **Export:** Kopiert die `player_save.json` in einen leicht zugänglichen `exported_save/`-Ordner.
+- **Import:** Überschreibt die lokale `player_save.json` mit der aus dem Export-Ordner und lädt die Daten neu, um die Änderungen sofort zu übernehmen.
