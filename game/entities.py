@@ -65,31 +65,22 @@ class Enemy(AnimatedSprite):
         self.set_animation('die', loop=False, on_end=on_death_callback)
 
 
-class Projectile(Widget):
+class Projectile(AnimatedSprite):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(
+            sheet_path='assets/projectile/Wood/Wood.png',
+            frame_width=8, frame_height=8, **kwargs)
         self.size = (24, 24)
-        with self.canvas:
-            texture = CoreImage('assets/projectile/Wood/Wood.png').texture
-            self.rect = Rectangle(texture=texture, pos=self.pos, size=self.size)
-        self.bind(pos=self._update_rect, size=self._update_rect)
+        self.add_animation('fly', frame_indices=[0], frame_rate=1.0)
+        self.set_animation('fly')
         self.trail_event = Clock.schedule_interval(self.spawn_trail, 1.0 / 30.0)
 
-    def _update_rect(self, *args):
-        self.rect.pos = self.pos
-        self.rect.size = self.size
-
     def spawn_trail(self, dt):
-        """
-        Erzeugt ein Schweif-Partikel.
-        """
         if not self.parent:
             self.trail_event.cancel()
             return
-
         trail_particle = TrailParticle(center=self.center)
         self.parent.add_widget(trail_particle, index=len(self.parent.children))
-
 
     def move(self, dt):
         self.y += 300 * dt

@@ -11,12 +11,17 @@ class Particle(Widget):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.velocity_x = random.uniform(-50, 50)
-        self.velocity_y = random.uniform(50, 150)
-        self.lifespan = random.uniform(0.3, 0.8)
+        self.velocity_x = random.uniform(-150, 150)
+        self.velocity_y = random.uniform(-100, 200)
+        self.lifespan = random.uniform(0.5, 1.2)
+
+        # Zufällige Farbe zwischen Gelb und Orange
+        r = 1.0
+        g = random.uniform(0.5, 1.0)
+        b = 0.0
 
         with self.canvas:
-            self.color = Color(1, 1, 0, 1) # Gelbe Partikel
+            self.color = Color(r, g, b, 1)
             self.rect = Rectangle(pos=self.pos, size=self.size)
 
         Clock.schedule_interval(self.update, 1.0 / 60.0)
@@ -58,10 +63,11 @@ class ParticleSystem:
     Ein System zur Verwaltung von Partikeleffekten.
     """
     @staticmethod
-    def create_explosion(parent, pos, num_particles=20):
+    def create_explosion(parent, pos, num_particles=40):
         """
         Erzeugt eine Partikel-Explosion an einer bestimmten Position.
         """
         for _ in range(num_particles):
-            particle = Particle(center=pos, size=(3, 3))
+            size = random.uniform(2, 5)
+            particle = Particle(center=pos, size=(size, size))
             parent.add_widget(particle)
