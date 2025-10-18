@@ -20,12 +20,20 @@ class GameScreen(Screen):
         self.add_widget(self.game_widget)
 
         # Button zum Öffnen des Skill-Trees
-        skill_tree_button = Button(text="Skill-Tree", size_hint=(None, None), size=(150, 50), pos=(10, 10))
+        skill_tree_button = Button(text="Skill-Tree", size_hint=(None, None), size=(150, 50), pos=(170, 10))
         skill_tree_button.bind(on_press=self.open_skill_tree)
         self.add_widget(skill_tree_button)
 
+        # Button zum Betreten der Stadt
+        city_button = Button(text="Stadt", size_hint=(None, None), size=(150, 50), pos=(10, 10))
+        city_button.bind(on_press=self.go_to_city)
+        self.add_widget(city_button)
+
     def open_skill_tree(self, instance):
         App.get_running_app().screen_manager.current = 'skill_tree'
+
+    def go_to_city(self, instance):
+        App.get_running_app().screen_manager.current = 'city'
 
 class CardSelectionScreen(Screen):
     def __init__(self, **kwargs):
@@ -307,6 +315,139 @@ class SkillTreeScreen(Screen):
         self.populate_skill_tree()
         self.skill_point_label.text = f"Skill-Punkte: {app.player_data.skill_points}"
 
+
+    def back_to_game(self, instance):
+        App.get_running_app().screen_manager.current = 'game'
+
+    def go_to_shop(self, instance):
+        App.get_running_app().screen_manager.current = 'shop'
+
+
+class ShopScreen(Screen):
+    """
+    Der Shop-Bildschirm für permanente Upgrades.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.layout = BoxLayout(orientation='vertical', spacing=10, padding=20)
+
+        title = Label(text="Händler", font_size='30sp', size_hint_y=None, height=50)
+        self.gold_label = Label(text="", font_size='20sp', size_hint_y=None, height=40)
+
+        self.layout.add_widget(title)
+        self.layout.add_widget(self.gold_label)
+
+        self.upgrades_layout = BoxLayout(orientation='vertical', spacing=15)
+        self.layout.add_widget(self.upgrades_layout)
+
+        back_button = Button(text="Zurück zur Stadt", size_hint_y=None, height=50)
+        back_button.bind(on_press=self.back_to_city)
+        self.layout.add_widget(back_button)
+
+        self.add_widget(self.layout)
+
+    def on_enter(self):
+        """Wird aufgerufen, wenn der Bildschirm betreten wird, um die UI zu aktualisieren."""
+        self.update_ui()
+
+    def update_ui(self):
+        """Aktualisiert die gesamte Shop-UI mit aktuellen Daten."""
+        app = App.get_running_app()
+        self.gold_label.text = f"Dein Gold: {app.player_data.gold}"
+
+        self.upgrades_layout.clear_widgets()
+
+        from game.config import SHOP_UPGRADES
+        for upgrade_id, upgrade_data in SHOP_UPGRADES.items():
+            current_level = app.player_data.shop_upgrades.get(upgrade_id, 0)
+
+            # Preisnachlass anwenden
+            base_cost = upgrade_data['cost_formula'](current_level)
+            price_reduction = app.shop_price_percent
+            cost = int(base_cost * (1 - price_reduction))
+
+            upgrade_box = BoxLayout(orientation='horizontal', size_hint_y=None, height=60)
+
+            info_text = f"{upgrade_data['name']} (Level {current_level})\n{upgrade_data['description']}"
+            info_label = Label(text=info_text, halign='left', valign='middle')
+            info_label.bind(size=info_label.setter('text_size'))
+
+            buy_button = Button(text=f"Kaufen ({cost} G)", size_hint_x=0.4)
+            buy_button.bind(on_press=lambda instance, u_id=upgrade_id: self.buy_upgrade(u_id))
+
+            if app.player_data.gold < cost:
+                buy_button.disabled = True
+
+            max_level = upgrade_data.get('max_level')
+            if max_level is not None and current_level >= max_level:
+                buy_button.text = "Max Level"
+                buy_button.disabled = True
+
+            upgrade_box.add_widget(info_label)
+            upgrade_box.add_widget(buy_button)
+            self.upgrades_layout.add_widget(upgrade_box)
+
+    def buy_upgrade(self, upgrade_id):
+        """Führt die Logik zum Kaufen eines Upgrades aus."""
+        app = App.get_running_app()
+        from game.config import SHOP_UPGRADES
+
+        upgrade_data = SHOP_UPGRADES[upgrade_id]
+        current_level = app.player_data.shop_upgrades.get(upgrade_id, 0)
+
+        # Kosten mit Preisnachlass berechnen
+        base_cost = upgrade_data['cost_formula'](current_level)
+        price_reduction = app.shop_price_percent
+        cost = int(base_cost * (1 - price_reduction))
+
+        if app.player_data.gold >= cost:
+            app.player_data.gold -= cost
+            app.player_data.shop_upgrades[upgrade_id] = current_level + 1
+            app.player_data.save_data()
+
+            # Wichtig: Stats neu berechnen, da sich der Preisnachlass ändern könnte
+            if hasattr(app, 'calculate_stats'):
+                app.calculate_stats()
+
+            self.update_ui() # UI nach dem Kauf aktualisieren
+        else:
+            print("Nicht genug Gold!")
+
+    def back_to_city(self, instance):
+        App.get_running_app().screen_manager.current = 'city'
+
+class CityScreen(Screen):
+    """
+    Der Stadt-Bildschirm, der als zentraler Hub für Meta-Gameplay-Features dient.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        layout = FloatLayout()
+
+        # Platzhalter-Titel
+        title = Label(text="Willkommen in der Stadt", font_size='30sp', size_hint=(None, None), size=(400, 50))
+        title.bind(size=self._update_title_pos)
+        self.bind(size=lambda *args: self._update_title_pos(title, self.size))
+        layout.add_widget(title)
+
+        # Händler-Button
+        merchant_button = Button(text="Händler", size_hint=(None, None), size=(200, 80), pos=(100, 250))
+        merchant_button.bind(on_press=self.go_to_shop)
+        layout.add_widget(merchant_button)
+
+        # Schmied-Button (vorerst ohne Funktion)
+        blacksmith_button = Button(text="Schmied", size_hint=(None, None), size=(200, 80), pos=(self.width - 300, 250))
+        layout.add_widget(blacksmith_button)
+
+        # Button zum Zurückkehren zum Spiel
+        back_button = Button(text="Zurück zum Kampf!", size_hint=(None, None), size=(200, 50), pos=(10, 10))
+        back_button.bind(on_press=self.back_to_game)
+        layout.add_widget(back_button)
+
+        self.add_widget(layout)
+
+    def _update_title_pos(self, instance, size):
+        instance.pos = (size[0] / 2 - instance.width / 2, size[1] - 100)
 
     def back_to_game(self, instance):
         App.get_running_app().screen_manager.current = 'game'

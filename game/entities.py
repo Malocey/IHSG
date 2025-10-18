@@ -2,6 +2,7 @@ import kivy
 from kivy.uix.widget import Widget
 from kivy.graphics import Rectangle
 from kivy.core.image import Image as CoreImage
+import random
 
 from kivy.clock import Clock
 from game.animation import AnimatedSprite, SpriteManager
@@ -58,11 +59,62 @@ class Enemy(AnimatedSprite):
 
     def die(self, on_death_callback):
         """
-        Startet die Todesanimation und entfernt die Lebensanzeige.
+        Startet die Todesanimation, lässt möglicherweise Gold fallen und entfernt die Lebensanzeige.
         """
         self.is_dying = True
         self.remove_widget(self.health_bar)
+
+        # Gold-Drop-Logik
+        if random.random() < 0.8:  # 80% Chance, Gold fallen zu lassen
+            gold_coin = GoldCoin(center=self.center)
+            if self.parent:
+                self.parent.add_widget(gold_coin)
+
+        # Seelenessenz-Drop-Logik
+        if random.random() < 0.1: # 10% Chance, Seelenessenz fallen zu lassen
+            soul_essence = SoulEssence(center=(self.center_x, self.center_y + 10))
+            if self.parent:
+                self.parent.add_widget(soul_essence)
+
+        # Todesanimation starten
         self.set_animation('die', loop=False, on_end=on_death_callback)
+
+
+class GoldCoin(Widget):
+    """
+    Eine Goldmünze, die von Gegnern fallengelassen und vom Spieler eingesammelt werden kann.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.size = (20, 20)
+        self.value = 1  # Jede Münze ist 1 Gold wert
+
+        with self.canvas:
+            texture = CoreImage('assets/items/GoldCoin.png').texture
+            self.rect = Rectangle(texture=texture, pos=self.pos, size=self.size)
+        self.bind(pos=self._update_rect)
+
+    def _update_rect(self, *args):
+        self.rect.pos = self.pos
+
+
+class SoulEssence(Widget):
+    """
+    Eine seltene Seelenessenz, die von Gegnern fallengelassen wird.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.size = (22, 22)
+        self.value = 1
+
+        with self.canvas:
+            # Annahme: Es gibt ein Bild für die Seelenessenz
+            texture = CoreImage('assets/items/SoulEssence.png').texture
+            self.rect = Rectangle(texture=texture, pos=self.pos, size=self.size)
+        self.bind(pos=self._update_rect)
+
+    def _update_rect(self, *args):
+        self.rect.pos = self.pos
 
 
 class Projectile(Widget):

@@ -1,11 +1,12 @@
 import kivy
 from kivy.uix.widget import Widget
+from kivy.uix.label import Label
 from kivy.clock import Clock
 from kivy.app import App
 from kivy.animation import Animation
 import random
 
-from game.entities import Hero, Enemy, Projectile
+from game.entities import Hero, Enemy, Projectile, GoldCoin, SoulEssence
 from game.ui import DamageNumber, XPCrystal
 from game.config import WAVE_CONFIG
 from game.effects import ParticleSystem
@@ -20,10 +21,23 @@ class GameWidget(Widget):
         self.projectiles = []
         self.damage_numbers = []
         self.xp_crystals = []
+        self.gold_coins = []
 
         self.level = 1
         self.xp = 0
         self.xp_to_next_level = 10
+
+        app = App.get_running_app()
+
+        # UI für Währungen
+        self.currency_layout = BoxLayout(orientation='vertical', pos=(10, 0), size_hint=(None, None))
+        self.gold_label = Label(text=f"Gold: {app.player_data.gold}", font_size='20sp')
+        self.soul_essence_label = Label(text=f"Essenz: {app.player_data.soul_essence}", font_size='20sp')
+        self.currency_layout.add_widget(self.gold_label)
+        self.currency_layout.add_widget(self.soul_essence_label)
+        self.add_widget(self.currency_layout)
+
+        self.bind(size=self._update_currency_labels_pos)
 
         self.current_wave_index = 0
         self.wave_time = 0
@@ -177,12 +191,35 @@ class GameWidget(Widget):
             crystal.y += crystal.velocity[1] * dt
 
             if self.hero.collide_widget(crystal):
+                app = App.get_running_app()
+                # XP-Bonus anwenden
+                xp_to_add = crystal.xp_value * (1 + app.xp_gain_percent)
+                self.xp += xp_to_add
+
                 self.xp_crystals.remove(crystal)
                 self.remove_widget(crystal)
-                self.xp += crystal.xp_value
                 print(f"XP gesammelt: {self.xp}/{self.xp_to_next_level}")
                 if self.xp >= self.xp_to_next_level:
                     self.level_up()
+
+        # Sammelt Goldmünzen und Seelenessenz auf
+        for item in self.children[:]:
+            if self.hero.collide_widget(item):
+                app = App.get_running_app()
+                if isinstance(item, GoldCoin):
+                    gold_to_add = item.value * (1 + app.gold_find_percent)
+                    app.player_data.gold += int(gold_to_add)
+                    self.gold_label.text = f"Gold: {app.player_data.gold}"
+                    self.remove_widget(item)
+                elif isinstance(item, SoulEssence):
+                    app.player_data.soul_essence += item.value
+                    self.soul_essence_label.text = f"Essenz: {app.player_data.soul_essence}"
+                    self.remove_widget(item)
+
+                app.player_data.save_data()
+
+    def _update_currency_labels_pos(self, instance, value):
+        self.currency_layout.pos = (10, self.height - self.currency_layout.height - 10)
 
     def check_crystal_fusion(self):
         """
