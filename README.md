@@ -1,95 +1,73 @@
 # Idle Horde Slayer
 
-This is a simple idle game where a hero automatically fights off waves of enemies. The player can upgrade the hero's abilities and unlock new features.
+Ein prozedural generiertes Idle-Spiel, bei dem ein Held automatisch Horden von Gegnern bekämpft. Der Spieler verbessert den Helden durch einen umfangreichen Skill-Tree, sammelt Loot, rüstet Gegenstände aus und kauft permanente Upgrades in einer Stadt.
+
+## Features
+
+-   **Prozedurale Karten:** Jede Runde findet in einer zufällig generierten Dungeon-Karte statt.
+-   **Automatischer Kampf:** Der Held bewegt sich und greift selbstständig an.
+-   **Tiefes Progressionssystem:**
+    -   Temporäre Upgrades während eines Runs.
+    -   Ein permanenter, passiver Skill-Tree.
+    -   Ein Loot-System mit Ausrüstungs-Slots.
+    -   Ein Shop in der Stadt für permanente Meta-Upgrades.
+-   **Visuelle Effekte:** Partikelexplosionen und andere Effekte für befriedigendes Gameplay-Feedback.
 
 ## Getting Started
 
-This project is built with the Kivy framework in Python. To get it running on your local machine, follow these steps.
+Dieses Projekt wird mit dem Kivy-Framework in Python entwickelt.
 
-### 1. Prerequisites
+### 1. Voraussetzungen
 
-*   Python 3.7+
-*   pip (Python package installer)
+-   Python 3.9+
+-   pip (Python package installer)
+-   Git
 
 ### 2. Setup
 
-1.  **Clone the repository:**
+1.  **Repository klonen:**
     ```bash
-    git clone <repository_url>
-    cd IdleHordeSlayer
+    git clone https://github.com/No-More-Interns/IHSG.git
+    cd IHSG
     ```
 
-2.  **Create and activate a virtual environment (recommended):**
+2.  **Virtuelle Umgebung erstellen und aktivieren (empfohlen):**
     ```bash
     python -m venv venv
     venv\Scripts\activate  # On Windows
     # source venv/bin/activate  # On macOS/Linux
     ```
 
-3.  **Install the required Python packages:**
+3.  **Abhängigkeiten installieren:**
     ```bash
     pip install -r requirements.txt
     ```
+    *Hinweis: Wenn es bei der Installation von Kivy zu Problemen kommt, stelle sicher, dass du die neuesten Build-Tools für deine Plattform installiert hast (z.B. Visual Studio Build Tools unter Windows).*
 
-### 3. Required Assets
+4.  **Assets herunterladen:**
+    Das Spiel benötigt externe Sprite-Sheet-Assets. Führe die folgenden Befehle im Hauptverzeichnis des Projekts aus, um sie in den `assets`-Ordner zu klonen:
+    ```bash
+    git clone https://github.com/s4m-ur4i/lpc-base-assets.git assets/hero
+    git clone https://github.com/s4m-ur4i/lpc-monsters.git assets/enemies
+    ```
 
-The game requires a few image assets to display the characters and effects. **You will need to download these files and place them in the `assets` directory according to the specified paths.**
+### 3. Spiel starten
 
-Create the following folder structure inside your project's root directory:
-```
-/assets
-|-- /hero
-|-- /enemy
-|-- /projectile
-```
-
-Here are the links to download the required sprites.
-
-*   **Hero (24x24):**
-    *   **Source:** [Universal LPC Sprite Sheet Character Generator](https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/)
-    *   **Instructions:**
-        1.  Use the generator to create a character.
-        2.  Select the "Walk" animation.
-        3.  Click "Download image pack with credits and JSON (ZIP)".
-        4.  From the downloaded ZIP, find a single frame of the walking animation (e.g., `walkcycle_e_0.png`).
-        5.  Rename it to `hero.png` and place it in the `assets/hero/` directory.
-    *   **License:** CC-BY-SA 3.0 or similar (Credit the artists as listed on the generator page).
-
-*   **Enemy (16x16):**
-    *   **Source:** [Pixel Crawler Free Asset Pack by Anokolisa](https://anokolisa.itch.io/free-pixel-art-asset-pack-topdown-tileset-rpg-16x16-sprites)
-    *   **Instructions:**
-        1.  Download the `Pixel Crawler - Free Pack 2.0.4.zip`.
-        2.  Inside the zip, navigate to `Pixel Crawler - Free Pack 2.0.4/Enemies/Orc/Idle`.
-        3.  Take any of the `*.png` files (e.g., `Orc_Idle_1.png`).
-        4.  Rename it to `enemy.png` and place it in `assets/enemy/`.
-    *   **License:** Free to use, but the author requests that you rate the asset pack on itch.io.
-
-*   **Projectile:**
-    *   **Source:** Also from the [Pixel Crawler Free Asset Pack](https://anokolisa.itch.io/free-pixel-art-asset-pack-topdown-tileset-rpg-16x16-sprites).
-    *   **Instructions:**
-        1.  In the same downloaded ZIP, navigate to `Pixel Crawler - Free Pack 2.0.4/Weapons/Wood/`.
-        2.  Find the `Arrow.png` file.
-        3.  Rename it to `projectile.png` and place it in `assets/projectile/`.
-    *   **License:** Same as the enemy asset.
-
-
-### 4. Running the Game
-
-You can run the game directly from the source code:
+Du kannst das Spiel direkt aus dem Quellcode starten:
 
 ```bash
 python main.py
 ```
 
-### 5. Building the Executable (Windows)
+### 4. Executable erstellen (Windows)
 
-To package the game into a standalone `.exe` file on Windows, simply run the provided build script:
+Um das Spiel in eine eigenständige `.exe`-Datei für Windows zu verpacken, führe das mitgelieferte Build-Skript aus:
 
 ```bash
 build_windows.bat
 ```
 
-The script will handle the dependency installation and the PyInstaller process. The final executable will be located in the `dist/IdleHordeSlayer` folder.
+Das Skript kümmert sich um die Installation der Abhängigkeiten und den PyInstaller-Prozess. Die fertige Anwendung befindet sich danach im Ordner `dist/main`.
 
 ---
-*This project is currently under development.*
+*Dieses Projekt befindet sich in aktiver Entwicklung.*
