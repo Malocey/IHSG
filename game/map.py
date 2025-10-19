@@ -131,3 +131,31 @@ class MapGenerator:
     def create_v_tunnel(self, y1, y2, x):
         for y in range(min(y1, y2), max(y1, y2) + 1):
             self.map_grid[y][x] = 'floor_1'
+
+class MapWidget(Widget):
+    def __init__(self, map_grid, tile_size, **kwargs):
+        super().__init__(**kwargs)
+        self.map_grid = map_grid
+        self.tile_size = tile_size
+        self.tileset_texture = CoreImage('assets/environment/Tilesets/Dungeon_Tiles.png').texture
+
+        self.textures = {}
+        for name, coords in TILE_MAPPING.items():
+            x, y = coords[0] * 16, coords[1] * 16
+            self.textures[name] = self.tileset_texture.get_region(x, y, 16, 16)
+
+        self.draw_map()
+
+    def draw_map(self):
+        self.canvas.clear()
+        with self.canvas:
+            for y, row in enumerate(self.map_grid):
+                for x, tile_name in enumerate(row):
+                    if tile_name and tile_name in self.textures:
+                        pos = (x * self.tile_size, y * self.tile_size)
+                        if tile_name.startswith('deco'):
+                            # Zeichne zuerst den Boden und dann die Deko darüber
+                            Rectangle(texture=self.textures['floor_1'], pos=pos, size=(self.tile_size, self.tile_size))
+                            Rectangle(texture=self.textures[tile_name], pos=pos, size=(self.tile_size, self.tile_size))
+                        else:
+                            Rectangle(texture=self.textures[tile_name], pos=pos, size=(self.tile_size, self.tile_size))
