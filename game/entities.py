@@ -66,9 +66,23 @@ class Enemy(AnimatedSprite):
 
 
 class Projectile(Widget):
-    def __init__(self, **kwargs):
+    def __init__(self, target, **kwargs):
         super().__init__(**kwargs)
         self.size = (24, 24)
+        self.speed = 400
+        self.target = target
+
+        # Richtung zum Ziel berechnen
+        direction_x = self.target.center_x - self.center_x
+        direction_y = self.target.center_y - self.center_y
+        distance = (direction_x**2 + direction_y**2)**0.5
+        if distance > 0:
+            self.velocity_x = (direction_x / distance) * self.speed
+            self.velocity_y = (direction_y / distance) * self.speed
+        else:
+            self.velocity_x = 0
+            self.velocity_y = self.speed # Fallback: nach oben bewegen
+
         with self.canvas:
             texture = CoreImage('assets/projectile/Wood/Wood.png').texture
             self.rect = Rectangle(texture=texture, pos=self.pos, size=self.size)
@@ -90,8 +104,8 @@ class Projectile(Widget):
         trail_particle = TrailParticle(center=self.center)
         self.parent.add_widget(trail_particle, index=len(self.parent.children))
 
-
     def move(self, dt):
-        self.y += 300 * dt
+        self.x += self.velocity_x * dt
+        self.y += self.velocity_y * dt
         if not self.parent:
             self.trail_event.cancel()

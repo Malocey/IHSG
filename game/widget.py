@@ -1,5 +1,6 @@
 import kivy
 from kivy.uix.widget import Widget
+from kivy.uix.label import Label
 from kivy.clock import Clock
 from kivy.app import App
 from kivy.animation import Animation
@@ -9,252 +10,267 @@ from game.entities import Hero, Enemy, Projectile
 from game.ui import DamageNumber, XPCrystal
 from game.config import WAVE_CONFIG
 from game.effects import ParticleSystem
+from game.map import MapGenerator, MapWidget
+
+class Camera(Widget):
+    pass
 
 class GameWidget(Widget):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.hero = Hero(pos=(375, 50))
-        self.add_widget(self.hero)
+
+        # Generate the procedural map
+        self.map_generator = MapGenerator(width=100, height=75)
+        self.map_grid = self.map_generator.generate_map()
+        self.map_widget = MapWidget(self.map_grid, tile_size=64)
+        self.add_widget(self.map_widget)
+
+        self.camera = Camera()
+        self.add_widget(self.camera)
+
+        # Place hero on a random floor tile
+        start_pos_tile = self.map_generator.get_random_floor_tile()
+        start_pos_pixels = (start_pos_tile[0] * 64, start_pos_tile[1] * 64)
+
+        self.hero = Hero(pos=start_pos_pixels)
+        self.camera.add_widget(self.hero)
 
         self.enemies = []
         self.projectiles = []
         self.damage_numbers = []
         self.xp_crystals = []
 
+        self.particle_system = ParticleSystem()
+        self.camera.add_widget(self.particle_system)
+
         self.level = 1
         self.xp = 0
         self.xp_to_next_level = 10
 
-        self.current_wave_index = 0
-        self.wave_time = 0
-        self.wave_event = None
-        self.spawn_event = None
         self.shoot_event = None
-        self.hero_speed = 100 # Standardwert
+        self.hero_speed = 100
+
+        self.wave_index = -1
+        self.wave_time = 0
+        self.spawn_event = None
+        self.hero_wander_target = None
 
         Clock.schedule_interval(self.update, 1.0 / 60.0)
         self.start_next_wave()
 
     def update_hero_stats(self, damage, speed, attack_cooldown):
-        """
-        Wird von der App-Klasse aufgerufen, um die Werte des Helden zu aktualisieren.
-        """
         self.hero.attack_damage = damage
         self.hero_speed = speed
-
-        # Planen des Schießens neu starten, um den neuen Cooldown zu verwenden
         if self.shoot_event:
             self.shoot_event.cancel()
         self.shoot_event = Clock.schedule_interval(self.shoot, attack_cooldown)
 
     def level_up(self):
-        """
-        Wird aufgerufen, wenn der Spieler genug XP gesammelt hat.
-        """
         self.level += 1
         self.xp = 0
-        self.xp_to_next_level = int(self.xp_to_next_level * 1.5) # Nächstes Level benötigt mehr XP
+        self.xp_to_next_level = int(self.xp_to_next_level * 1.5)
         print(f"Level Up! Level {self.level}")
-
-        # Wechsel zum Kartenauswahl-Bildschirm
         App.get_running_app().screen_manager.current = 'card_selection'
 
-    def start_next_wave(self):
-        """
-        Startet die nächste Welle basierend auf der Konfiguration.
-        """
-        if self.wave_event:
-            self.wave_event.cancel()
-        if self.spawn_event:
-            self.spawn_event.cancel()
-
-        wave_data = WAVE_CONFIG[self.current_wave_index % len(WAVE_CONFIG)]
-        self.wave_time = wave_data['duration']
-
-        # Plant das Ende der Welle
-        self.wave_event = Clock.schedule_once(self.end_wave, self.wave_time)
-        # Startet das Spawnen von Gegnern für diese Welle
-        self.spawn_event = Clock.schedule_interval(self.spawn_enemy, wave_data['spawn_interval'])
-        print(f"Welle {self.current_wave_index + 1} gestartet!")
-
-    def end_wave(self, dt):
-        """
-        Beendet die aktuelle Welle und startet die nächste.
-        """
-        print(f"Welle {self.current_wave_index + 1} beendet!")
-        self.current_wave_index += 1
-        # Optional: Kurze Pause zwischen den Wellen
-        Clock.schedule_once(lambda dt: self.start_next_wave(), 3)
-
-    def spawn_enemy(self, dt):
-        """
-        Spawnt einen zufälligen Gegner aus der aktuellen Wellenkonfiguration.
-        """
-        wave_data = WAVE_CONFIG[self.current_wave_index % len(WAVE_CONFIG)]
-        if len(self.enemies) >= wave_data['max_enemies']:
+    def shoot(self, dt):
+        target = self.get_closest_entity(self.hero, self.enemies)
+        if not target:
             return
 
-        enemy_type = random.choice(wave_data['enemies'])
-
-        # Hier könnte man je nach `enemy_type` unterschiedliche Klassen instanziieren.
-        # Vorerst verwenden wir nur die Standard-`Enemy`-Klasse.
-        enemy = Enemy()
-        enemy.x = random.randint(0, self.width - enemy.width)
-        enemy.y = self.height
-
-        # Erhöht die Lebenspunkte der Gegner mit jeder Runde durch die Wellen
-        difficulty_multiplier = 1 + 0.1 * (self.current_wave_index // len(WAVE_CONFIG))
-        enemy.max_health *= difficulty_multiplier
-        enemy.health = enemy.max_health
-
-        self.enemies.append(enemy)
-        self.add_widget(enemy)
-
-    def shoot(self, dt):
-        projectile = Projectile()
-        projectile.center_x = self.hero.center_x
-        projectile.y = self.hero.top
+        projectile = Projectile(target=target)
+        projectile.center = self.hero.center
         self.projectiles.append(projectile)
-        self.add_widget(projectile)
+        self.camera.add_widget(projectile)
 
     def update(self, dt):
-        # Aktualisiert die Animationen für alle animierten Objekte.
+        # Center camera on hero
+        self.camera.pos = (self.width / 2 - self.hero.center_x, self.height / 2 - self.hero.center_y)
+        self.map_widget.pos = self.camera.pos
+
+        # Update animations and particles
         self.hero.update_animation(dt)
         for enemy in self.enemies:
             enemy.update_animation(dt)
+        self.particle_system.update(dt)
 
-        # Bewegt den Helden und setzt seine Position zurück, wenn er den Bildschirmrand erreicht.
-        self.hero.x += self.hero_speed * dt
-        if self.hero.right > self.width or self.hero.x < 0:
-            self.hero.x = 0
+        # Update wave logic
+        self.wave_time += dt
+        if self.wave_index < len(WAVE_CONFIG):
+            current_wave = WAVE_CONFIG[self.wave_index]
+            if self.wave_time > current_wave['duration']:
+                self.start_next_wave()
 
-        # Bewegt Projektile und prüft auf Kollisionen.
+        # Hero AI movement
+        self.update_hero_movement(dt)
+
+        # Move projectiles and check for collisions
         for p in self.projectiles[:]:
             p.move(dt)
-            if p.y > self.height:
+            if self.is_wall(p.center_x, p.center_y):
                 self.projectiles.remove(p)
-                self.remove_widget(p)
+                self.camera.remove_widget(p)
                 continue
 
             for enemy in self.enemies[:]:
                 if not enemy.is_dying and p.collide_widget(enemy):
-                    # Projektil entfernen
                     self.projectiles.remove(p)
-                    self.remove_widget(p)
+                    self.camera.remove_widget(p)
 
-                    # Schaden zufügen und Schadenszahl anzeigen
-                    is_dead = enemy.take_damage(self.hero.attack_damage)
-                    damage_number = DamageNumber(damage=self.hero.attack_damage, center_x=enemy.center_x, y=enemy.top)
-                    self.add_widget(damage_number)
+                    damage = self.hero.attack_damage
+                    is_dead = enemy.take_damage(damage)
 
-                    # Partikel-Explosion erzeugen
-                    ParticleSystem.create_explosion(self, pos=enemy.center)
+                    damage_number = DamageNumber(text=str(damage), center=enemy.center)
+                    self.camera.add_widget(damage_number)
 
                     if is_dead:
-                        # Todesanimation starten
                         enemy.die(on_death_callback=lambda e=enemy: self.on_enemy_death(e))
                     break
 
-        # Bewegt Gegner, die nicht gerade sterben.
+        # Move enemies
         for enemy in self.enemies[:]:
             if not enemy.is_dying:
-                enemy.y -= 100 * dt
-                if enemy.top < 0:
-                    self.enemies.remove(enemy)
-                    self.remove_widget(enemy)
+                # Simple movement towards hero with wall collision
+                direction_x, direction_y = self.hero.center_x - enemy.center_x, self.hero.center_y - enemy.center_y
+                distance = (direction_x**2 + direction_y**2)**0.5
+                if distance > 1:
+                    vx = (direction_x / distance) * 80 * dt # 80 is enemy speed
+                    vy = (direction_y / distance) * 80 * dt
 
-        # Sammelt XP-Kristalle auf und prüft auf Fusion
-        self.check_crystal_fusion()
+                    new_x = enemy.x + vx
+                    new_y = enemy.y + vy
+                    if not self.is_wall(new_x + enemy.width / 2, new_y + enemy.height / 2):
+                        enemy.pos = (new_x, new_y)
+                    else:
+                        # Simple wall sliding
+                        if not self.is_wall(enemy.x + vx + enemy.width/2, enemy.y + enemy.height/2):
+                            enemy.x += vx
+                        elif not self.is_wall(enemy.x + enemy.width/2, enemy.y + vy + enemy.height/2):
+                            enemy.y += vy
+
+        # Collect XP crystals
         for crystal in self.xp_crystals[:]:
-            # Kristalle bewegen sich auf den Helden zu
-            direction = self.hero.center_x - crystal.center_x, self.hero.center_y - crystal.center_y
-            distance = (direction[0]**2 + direction[1]**2)**0.5
-            if distance < 1:
-                distance = 1
-
-            crystal.velocity = (direction[0] / distance * 200, direction[1] / distance * 200)
-            crystal.x += crystal.velocity[0] * dt
-            crystal.y += crystal.velocity[1] * dt
-
             if self.hero.collide_widget(crystal):
                 self.xp_crystals.remove(crystal)
-                self.remove_widget(crystal)
+                self.camera.remove_widget(crystal)
                 self.xp += crystal.xp_value
-                print(f"XP gesammelt: {self.xp}/{self.xp_to_next_level}")
                 if self.xp >= self.xp_to_next_level:
                     self.level_up()
 
-    def check_crystal_fusion(self):
-        """
-        Prüft, ob XP-Kristalle fusioniert werden können.
-        """
-        crystals_by_tier = {}
-        for crystal in self.xp_crystals:
-            if crystal.tier not in crystals_by_tier:
-                crystals_by_tier[crystal.tier] = []
-            crystals_by_tier[crystal.tier].append(crystal)
-
-        for tier, crystals in crystals_by_tier.items():
-            if len(crystals) < 5:
-                continue
-
-            # Finde Gruppen von 5 Kristallen, die nahe beieinander liegen
-            for i in range(len(crystals) - 4):
-                group_to_fuse = [crystals[i]]
-                for j in range(i + 1, len(crystals)):
-                    if len(group_to_fuse) < 5:
-                        # Prüfe Distanz zum ersten Kristall der potenziellen Gruppe
-                        dist_x = crystals[j].center_x - group_to_fuse[0].center_x
-                        dist_y = crystals[j].center_y - group_to_fuse[0].center_y
-                        if (dist_x**2 + dist_y**2)**0.5 < 100: # Fusions-Radius
-                            group_to_fuse.append(crystals[j])
-
-                if len(group_to_fuse) >= 5:
-                    # Fusion durchführen
-                    avg_x = sum(c.center_x for c in group_to_fuse) / 5
-                    avg_y = sum(c.center_y for c in group_to_fuse) / 5
-
-                    # Alten Kristalle entfernen
-                    for c in group_to_fuse:
-                        self.xp_crystals.remove(c)
-                        self.remove_widget(c)
-
-                    # Neuen, höherstufigen Kristall erstellen
-                    new_crystal = XPCrystal(tier=tier + 1, center=(avg_x, avg_y))
-                    self.xp_crystals.append(new_crystal)
-                    self.add_widget(new_crystal)
-
-                    # Nach einer Fusion die Prüfung für diesen Frame beenden, um Komplexität zu reduzieren
-                    return
-
-
     def on_enemy_death(self, enemy):
-        """
-        Wird aufgerufen, wenn die Todesanimation eines Gegners abgeschlossen ist.
-        """
         if enemy in self.enemies:
-            # XP-Kristall an der Position des Gegners erstellen
+            self.particle_system.create_explosion(enemy.center)
             xp_crystal = XPCrystal(center=enemy.center)
             self.xp_crystals.append(xp_crystal)
-            self.add_widget(xp_crystal)
+            self.camera.add_widget(xp_crystal)
 
-            self.enemies.remove(enemy)
-            self.remove_widget(enemy)
-            # Löst einen Screen-Shake aus, wenn ein Gegner besiegt wird.
+            Clock.schedule_once(lambda dt, e=enemy: self.remove_enemy(e), 0.5)
             self.screen_shake()
 
-    def screen_shake(self, duration=0.1, magnitude=5):
-        """
-        Schüttelt den Bildschirm, indem die Position des Haupt-Widgets animiert wird.
-        """
-        original_pos = self.pos
+    def remove_enemy(self, enemy):
+        if enemy in self.enemies:
+            self.enemies.remove(enemy)
+            self.camera.remove_widget(enemy)
 
-        # Eine Sequenz von schnellen Bewegungen, um einen Schütteleffekt zu erzeugen
+    def update_hero_movement(self, dt):
+        target = self.get_closest_entity(self.hero, self.xp_crystals)
+        if not target:
+            target = self.get_closest_entity(self.hero, self.enemies)
+
+        if not target:
+            # Wander behavior when no targets are present
+            if not self.hero_wander_target or self.hero.collide_point(*self.hero_wander_target):
+                random_tile = self.map_generator.get_random_floor_tile()
+                self.hero_wander_target = (random_tile[0] * self.map_widget.tile_size,
+                                           random_tile[1] * self.map_widget.tile_size)
+
+            target_pos = self.hero_wander_target
+        else:
+            target_pos = target.center
+
+        direction_x, direction_y = target_pos[0] - self.hero.center_x, target_pos[1] - self.hero.center_y
+        distance = (direction_x**2 + direction_y**2)**0.5
+        if distance > 1:
+            vx = (direction_x / distance) * self.hero_speed * dt
+            vy = (direction_y / distance) * self.hero_speed * dt
+
+            # Check for wall collision before moving
+            new_x = self.hero.x + vx
+            new_y = self.hero.y + vy
+            if not self.is_wall(new_x + self.hero.width / 2, new_y + self.hero.height / 2):
+                self.hero.pos = (new_x, new_y)
+            else:
+                # Simple wall sliding: try moving only on X or Y axis
+                if not self.is_wall(self.hero.x + vx + self.hero.width / 2, self.hero.y + self.hero.height/2):
+                    self.hero.x += vx
+                elif not self.is_wall(self.hero.x + self.hero.width/2, self.hero.y + vy + self.hero.height/2):
+                    self.hero.y += vy
+
+    def get_closest_entity(self, entity, entity_list):
+        closest_entity = None
+        min_dist_sq = float('inf')
+        for other in entity_list:
+            if hasattr(other, 'is_dying') and other.is_dying:
+                continue
+            dist_sq = entity.collide_point(*other.center)**2
+            if dist_sq < min_dist_sq:
+                min_dist_sq = dist_sq
+                closest_entity = other
+        return closest_entity
+
+    def screen_shake(self, duration=0.1, magnitude=5):
+        original_pos = self.camera.pos
         anim = Animation(x=original_pos[0] + magnitude, y=original_pos[1] - magnitude, duration=duration / 4) + \
                Animation(x=original_pos[0] - magnitude, y=original_pos[1] + magnitude, duration=duration / 4) + \
                Animation(x=original_pos[0] + magnitude, y=original_pos[1] + magnitude, duration=duration / 4) + \
                Animation(x=original_pos[0] - magnitude, y=original_pos[1] - magnitude, duration=duration / 4)
-
-        # Am Ende zur ursprünglichen Position zurückkehren
         anim += Animation(pos=original_pos, duration=0.05)
-        anim.start(self)
+        anim.start(self.camera)
+
+    def is_wall(self, x, y):
+        """ Checks if a given pixel coordinate is a wall. """
+        tile_x = int(x // self.map_widget.tile_size)
+        tile_y = int(y // self.map_widget.tile_size)
+        if 0 <= tile_y < len(self.map_grid) and 0 <= tile_x < len(self.map_grid[0]):
+            return self.map_grid[tile_y][tile_x] == 'WALL'
+        return True # Treat out of bounds as a wall
+
+    def start_next_wave(self):
+        self.wave_index += 1
+        if self.wave_index >= len(WAVE_CONFIG):
+            print("All waves completed!")
+            self.wave_index = 0 # Loop waves for now
+
+        self.wave_time = 0
+        wave_data = WAVE_CONFIG[self.wave_index]
+        print(f"Wave {self.wave_index + 1} starting!")
+
+        if self.spawn_event:
+            self.spawn_event.cancel()
+        self.spawn_event = Clock.schedule_interval(self.spawn_enemy, wave_data['spawn_interval'])
+
+    def spawn_enemy(self, dt):
+        wave_data = WAVE_CONFIG[self.wave_index]
+        if len(self.enemies) >= wave_data['max_enemies']:
+            return
+
+        # Find a valid spawn point on a floor tile, not too close to the player
+        for _ in range(50): # Try 50 times to find a valid spot
+            spawn_tile = self.map_generator.get_random_floor_tile()
+            spawn_pos = (spawn_tile[0] * self.map_widget.tile_size,
+                         spawn_tile[1] * self.map_widget.tile_size)
+
+            # Check distance from hero
+            dist_x = self.hero.center_x - spawn_pos[0]
+            dist_y = self.hero.center_y - spawn_pos[1]
+            distance_sq = dist_x**2 + dist_y**2
+
+            # Ensure enemies spawn off-screen but not thousands of miles away
+            # Use screen dimensions for spawn distance relative to player's view
+            min_dist_sq = (self.width * 0.6)**2  # Just outside the screen
+            max_dist_sq = (self.width * 2.0)**2 # A bit further out
+
+            if min_dist_sq < distance_sq < max_dist_sq:
+                enemy = Enemy(pos=spawn_pos)
+                self.enemies.append(enemy)
+                self.camera.add_widget(enemy)
+                return # Successfully spawned

@@ -53,15 +53,24 @@ class TrailParticle(Widget):
         anim.bind(on_complete=lambda *args: self.parent.remove_widget(self) if self.parent else None)
         anim.start(self)
 
-class ParticleSystem:
+class ParticleSystem(Widget):
     """
-    Ein System zur Verwaltung von Partikeleffekten.
+    Ein System zur Verwaltung von Partikeleffekten, das jetzt ein Widget ist.
     """
-    @staticmethod
-    def create_explosion(parent, pos, num_particles=20):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.particles = []
+
+    def create_explosion(self, pos, num_particles=20):
         """
         Erzeugt eine Partikel-Explosion an einer bestimmten Position.
         """
         for _ in range(num_particles):
             particle = Particle(center=pos, size=(3, 3))
-            parent.add_widget(particle)
+            self.particles.append(particle)
+            self.add_widget(particle)
+
+    def update(self, dt):
+        # The particles update themselves, but we could add system-wide logic here if needed.
+        # For now, this method is a placeholder to be called from the main game loop.
+        pass
